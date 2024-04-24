@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:include="main/import :: head"></head>
+<body>
+	<div id="app" class="contain">
+		
+		<div v-if="full_loading" class="full_loading"></div>
+		
+		<el-container>
+			<!-- 해더 -->
+			<el-header>
+				<!-- Logo -->
+				<div class="logo" :class="logo_animation" style="cursor: pointer;">
+					<img src="/img/logo.png"/>
+					<span v-if="showTitle" th:text="#{매장관리}"></span>
+				</div>
+				
+				<!-- 기타 메세지 -->
+				<div class="title" :class="title_animation">
+					<el-button @click.ones="menuCollapse" size="mini" style="float: left;">
+						<i class="icon iconfont icon-menu"></i>
+					</el-button>
+					<div class="login_info" th:utext="#{<b>{0}</b> <b>{1}</b>님 로그인 되었습니다.(${sa_show_nm}, ${sa_account.accountNm})}"></div>					
+				</div>
+				
+				<!-- 구글 다국어 지원 부분 -->
+				<!-- div id="google_translate_element"></div -->
+				
+				<!-- 사용자 정보 표시 부분 -->
+				<div class="info">
+					<!-- <el-dropdown @command="lanChange">
+						<span class="el-dropdown-link">
+							{{ localeNm }}<i class="el-icon-arrow-down el-icon--right"></i>
+						</span>
+						<el-dropdown-menu slot="dropdown">
+							<el-dropdown-item v-for="item in lan" :command="item" :key="item.id">{{ item.nm }}</el-dropdown-item>
+						</el-dropdown-menu>
+					</el-dropdown> -->
+
+					<el-button @click.ones="userInfo" size="mini" circle>
+						<i class="icon iconfont icon-people"></i>
+					</el-button>
+					
+					<el-button @click.ones="logout" size="mini" circle>
+						<i class="icon iconfont icon-logout"></i>
+					</el-button>
+				</div>
+			</el-header>
+
+			<!-- Contents -->
+			<el-container>
+				<!-- 메뉴 -->
+				<!-- 주문관리 메뉴를 defaul-active로 설정하기위해(글자색 빨간색 설정) 주문관리 resourcesCd값인 255로 default-active 값을 세팅함 2023.11.02 -->
+				<el-menu default-active="255" @select="handleSelect" :collapse="menuIsCollapse" unique-opened :style="{ height: screenHeight-60 + 'px' }">
+					<template v-for="menu1 in menuList" :key="menu1.resourcesCd">
+						<el-menu-item v-if="1 == menu1.mlevel && (null == menu1.subMenu || menu1.subMenu.length == 0)" :index="menu1.resourcesCd">
+							<i class="icon iconfont" :class="menu1.menuIcon"></i>
+							<span slot="title">{{ menu1.menuNmLan }}</span>
+						</el-menu-item>
+						
+						<el-submenu v-else :index="menu1.resourcesCd">
+							<template slot="title">
+								<i class="icon iconfont" :class="menu1.menuIcon"></i>
+								<span slot="title">{{ menu1.menuNmLan }}</span>
+							</template>
+							
+							<el-menu-item :index="menu2.resourcesCd" v-for="menu2 in menu1.subMenu" :key="menu2.resourcesCd">
+								<i class="icon iconfont" :class="menu2.menuIcon"></i>
+								<span slot="title">{{ menu2.menuNmLan }}</span>
+							</el-menu-item>
+						</el-submenu>
+					</template>
+				</el-menu>
+
+				<!-- 메인 컨텐츠 부분 -->
+				<el-main>
+					<!-- 패널 -->
+					<el-card shadow="never" v-loading="contents_loading">
+						<div slot="header">
+							<i class="icon iconfont" :class="menuIcon"></i>
+							<span>{{menuTitle}}</span>
+						</div>
+						
+						<iframe :src="menuUrl" id="mainFrame" name="mainFrame"
+							scrolling="no" width="100%" height="100%" frameborder="0" marginheight="0" marginwidth="0">
+						</iframe>
+					</el-card>
+					
+					<!-- 공지사항 팝업 -->
+					<el-dialog th:title="#{공지사항}" :visible.sync="notiDialogVisible" width="60%" class="noti-dialog"
+						:close-on-click-modal="false">
+						
+						<el-collapse v-model="collapse_val" v-for="(noti, index) in notiData" :key="'noti_' + index" accordion>
+							<el-collapse-item :name="index">
+								<template slot="title" >
+									<el-badge value="new" v-if="isNew(noti.startDtm)">
+										<div class="noti-title">{{ '[ ' + noti.startDtm + ' ] ' + noti.notiTitle }}</div>
+									</el-badge>
+									
+									<div class="noti-title" v-else>{{ '[ ' + noti.startDtm + ' ] ' + noti.notiTitle }}</div>
+									
+								</template>
+								<div v-html="noti.content" class="noti-content"></div>
+							</el-collapse-item>
+						</el-collapse>
+		
+						<span slot="footer" class="dialog-footer">
+							<el-button size="small" th:text="#{해당 공지 이젠 그만보기}" @click="notiDisabled"></el-button>
+							<el-button @click="notiDialogVisible = false" th:text="#{닫기}" size="small"></el-button>
+						</span>
+					</el-dialog>
+				</el-main>
+				
+			</el-container>
+		</el-container>
+		
+		<audio id="audio" style="display: none;">
+			<source src="/img/dingdong.mp3" type="audio/mpeg">
+		</audio>
+    </div>
+    
+    <script type="text/javascript" src="/libs/socket/swfobject.js"></script>
+	<script type="text/javascript" src="/libs/socket/web_socket.js"></script>
+	
+	
+	
+    <!-- JS -->
+	<script type="text/javascript" charset="UTF-8">
+	/*<![CDATA[*/
+
+		const appMsg = {
+		    loadingMsg: "[[#{처리중 입니다...}]]",
+		    systemAlterTitle: "[[#{시스템 메세지}]]",
+		    systemAlterButton: "[[#{로그인 페이지로 돌아가기}]]",
+		    systemAlterTimeoutMsg: "[[#{연결 시간 초과 하였습니다. 다시 로그인 하십시오.}]]",
+		    systemAlterNoPermissionsMsg: "[[#{권한 부족하여 리소스에 접근 할 수 없습니다.}]]",
+		    systemBtnOk: "[[#{확인}]]",
+		    systemBtnClose: "[[#{닫기}]]"
+		}
+
+		/* 공통코드, 변하지 안는 코드만 하드 코딩으로  */
+		const code = {
+				default_: [{label: "O", value: true}, {label: "", value: false}],
+				yn: [{label: "Y", value: "Y"}, {label: "N", value: "N"}],
+				answeredYn: [{label: "[[#{답변}]]", value: true}, {label: "[[#{미답변}]]", value: false}],
+				payYn: [{label: "[[#{결제}]]", value: "Y"}, {label: "[[#{미결제}]]", value: "N"}],
+				cancelYn: [{label: "[[#{주문 취소}]]", value: "Y"}, {label: "[[#{주문}]]", value: "N"}],
+				cancelPay: [{label: "[[#{결제 취소}]]", value: "Y"}, {label: "[[#{결제}]]", value: "N"}],
+				printYn: [{label: "[[#{출력}]]", value: "Y"}, {label: "[[#{미출력}]]", value: "N"}],
+				useYn: [{label: "[[#{사용 가능}]]", value: "Y"}, {label: "[[#{사용 불가능}]]", value: "N"}],
+				nonLocked: [{label: "[[#{사용 가능}]]", value: "Y"}, {label: "[[#{잠금}]]", value: "N"}],
+				nonExpired: [{label: "[[#{사용 가능}]]", value: "Y"}, {label: "[[#{만료}]]", value: "N"}],
+				certificateNonExpired: [{label: "[[#{사용 가능}]]", value: "Y"}, {label: "[[#{인증 만료}]]", value: "N"}],
+				gender: [{label: "[[#{남}]]", value: "M"}, {label: "[[#{여}]]", value: "F"}],
+				design: [{label: "[[#{세로보기}]]", value: "V"}, {label: "[[#{가로보기}]]", value: "H"}],
+				currency: [{label: "[[#{KRW}]]", value: "KRW"}, {label: "[[#{USD}]]", value: "USD"}],
+				wait_time: [{label: "[[#{5분}]]", value: "5"}, 
+							{label: "[[#{10분}]]", value: "10"},
+							{label: "[[#{15분}]]", value: "15"},
+							{label: "[[#{20분}]]", value: "20"},
+							{label: "[[#{25분}]]", value: "25"},
+							{label: "[[#{30분}]]", value: "30"},
+							{label: "[[#{35분}]]", value: "35"},
+							{label: "[[#{40분}]]", value: "40"},
+							{label: "[[#{45분}]]", value: "45"},
+							{label: "[[#{50분}]]", value: "50"},
+							{label: "[[#{55분}]]", value: "55"},
+							{label: "[[#{60분}]]", value: "60"}
+							],
+				method: [{label: "NONE", value: "NONE"},{label: "GET", value: "GET"},{label: "POST", value: "POST"},
+					{label: "PUT", value: "PUT"},{label: "DELETE", value: "DELETE"},{label: "PATCH", value: "PATCH"}],
+				storeTp: [
+					{label: "[[#{한식}]]", value: "SC01"},
+					{label: "[[#{분식}]]", value: "SC02"},
+					{label: "[[#{카페/디저트}]]", value: "SC03"},
+					{label: "[[#{일식/돈까스}]]", value: "SC04"},
+					{label: "[[#{중식}]]", value: "SC05"},
+					{label: "[[#{족발}]]", value: "SC06"},
+					{label: "[[#{피자/양식}]]", value: "SC07"},
+					{label: "[[#{치킨}]]", value: "SC08"},
+					{label: "[[#{야식}]]", value: "SC09"},
+					{label: "[[#{패스트푸드}]]", value: "SC10"}
+				]
+		}
+		
+		
+		// Set URL of your WebSocketMain.swf here:
+	    WEB_SOCKET_SWF_LOCATION = "/libs/socket/WebSocketMain.swf";
+	    // Set this to dump debug message from Flash to console.log:
+	    WEB_SOCKET_DEBUG = true;
+		
+		/* 공용 Component 설정 */
+		var mainVue = new Vue({
+			el: '#app',
+			data: function() {
+				return {
+					full_loading: true,		// 로딩 이미지 표시 상태
+					contents_loading: false,
+					loading_: null,			// 로딩 변수
+					currVue: null,
+					screenHeight: document.documentElement.clientHeight,
+					lan: [],
+					locale: '[[${locale}]]',
+					localeNm: '',
+					menuList: null,			// 메뉴 리스트
+					menuIsCollapse: false,	// 메뉴 상태
+					showTitle: true,
+					logo_animation: "",
+					title_animation: "",
+					menuTitle: '',			// 현재 탭
+					menuIcon: '',			// 아이콘
+					menuUrl: '',			// 메뉴 주소
+					resourcesCd: 0,
+					code: code,
+					appMsg: appMsg,
+					notiDialogVisible: false,
+					notiData: [],
+					websock: null,
+					collapse_val: 0
+				}
+			},
+			created: function () {
+				// Axios설정
+				this.$axios = axiosUtil.init(this);
+				
+				// 메뉴 데이타 설정
+				this.getMenu();
+				
+				// 언어 데이타 설정
+				this.getLanguage();
+				
+				this.showNoti();
+				
+				//메인프레임 menuUrl설정
+				this.setMainMenu();
+				
+				// 매장 관리자 일때만 사용
+				
+				
+				console.log('===============isOrderNoti:' + '[[${ isOrderNoti }]]');
+				
+        		if ('true' == '[[${ isOrderNoti }]]') {
+        			console.log('============= callMessage =================');
+        			this.initOrderMessage();
+        			//this.initWebSocket();
+        		}
+			},
+			mounted: function () {
+				// 로딩 이미지 숨김
+				this.full_loading = false;
+				
+	            window.onresize = function() {
+	                this.screenHeight = document.documentElement.clientHeight;
+	            }.bind(this);
+	        },
+	        watch: {
+	            'screenHeight': function() {
+	            	this.setHeights();
+	            },
+	            'currVue': function() {
+	            	this.setHeights();
+	            }
+	        },
+			methods: {
+				// 공통으로 사용 되는 data 설정
+				initData: function () {
+					return {
+						size: 'small',			// 사이트 싸이즈
+						mainVue: this,
+		                searchHeight: 500,
+		                buttonsHeight: 50,
+						tableHeight: 350,
+						popTableHeight: 300,
+						subTableHeight: 300,
+						subTableHeight2: 260,
+						inputHeight: 300,
+						url: "",
+						tableData: [],
+						selectData: null,
+						checkedData: [],
+						searchForm: {},
+						inputForm: null,
+						formError: null,
+						fromDisabled: true,
+						dialogFormVisible: false,
+						btn: {
+							addDisabled: false,
+							upDisabled: true,
+							delDisabled: true,
+							saveDisabled: true
+						}
+					}
+				},
+				// 높이 계산해서 설정
+				setHeights: function () {
+					if (null != this.currVue) {
+
+						console.log('===$refs.search_form.offsetHeight:' + this.currVue.$refs.search_form.offsetHeight);
+
+			       		this.currVue.searchHeight = this.currVue.$refs.search_form.offsetHeight;
+						this.currVue.buttonsHeight = this.currVue.$refs.buttons.offsetHeight;
+						   
+						   
+						
+			       		this.currVue.tableHeight = this.currVue.$el.offsetHeight - this.currVue.searchHeight - this.currVue.buttonsHeight - 32;
+			       		this.currVue.subTableHeight = this.currVue.$el.offsetHeight - this.currVue.searchHeight - this.currVue.buttonsHeight - 125;
+			       		this.currVue.subTableHeight2 = this.currVue.$el.offsetHeight - this.currVue.searchHeight - this.currVue.buttonsHeight - 179;
+			       		this.currVue.inputHeight = this.currVue.$el.offsetHeight - this.currVue.searchHeight - this.currVue.buttonsHeight - 34;
+			       		
+			       		this.currVue.popTableHeight = this.currVue.$el.offsetHeight - 230;
+			       		
+						this.contents_loading = false;
+					}
+				},
+				// 메뉴 
+				getMenu: function () {
+					// 메뉴 데이타 호출
+					this.$axios.search("/mainMenu", null, function (result) {
+						var topMenu = [];
+						
+						// 1차 메뉴
+						for (var i = 0, len = result.length; i < len; i++) {
+							if (1 == result[i].mlevel) {
+								topMenu.push(result[i]);
+							}
+						}
+						
+						// 2차 메뉴
+						for (var i = 0, len = result.length; i < len; i++) {
+							if (2 == result[i].mlevel) {
+								for (var j = 0, jlen = topMenu.length; j < jlen; j++) {
+									if (undefined == topMenu[j].subMenu) {
+										topMenu[j].subMenu = [];
+									}
+									
+									if (topMenu[j].resourcesCd == result[i].topMenu.resourcesCd) {
+										topMenu[j].subMenu.push(result[i]);
+									}
+								}
+							}
+						}
+						
+						this.menuList = topMenu;
+					}.bind(this), true);
+				},
+				getLanguage: function () {
+					var authId = '[[${sa_account.getAuths()[0].getAuthId()}]]';
+            		
+					var storeId = null;
+					
+					if ('storeMng' == authId) {
+						storeId = '[[${storeId}]]';
+					}
+						
+           			this.$axios.search("/language", { storeId: storeId }, function (result) {
+   						this.lan = result;
+   						console.log('===========this.lan.length:' + this.lan.length);
+   						for (var i = 0, len = this.lan.length; i < len; i++) {
+   							if (this.lan[i].id == this.locale) {
+   								this.localeNm = this.lan[i].nm;
+   								break;
+   							}
+   						}
+   					}.bind(this), false);
+				},
+				// 언어 바꿈 이벤트 설정
+            	lanChange: function (locale) {
+            		this.localeNm = locale.nm;
+            		location.href = "login?locale=" + locale.id;
+            	},
+            	// 계정 정보
+            	userInfo: function () {
+            		var authId = '[[${sa_account.getAuths()[0].getAuthId()}]]';
+            		
+            		if ('custMng' == authId) {
+            			this.menuUrl = "/v/business/user/cust";
+            		} else if ('storeMng' == authId) {
+            			this.menuUrl = "/v/business/user/store";
+            		} else {
+            			this.menuUrl = "/v/system/account/info";	
+            		}
+            		
+					this.resourcesCd = 0;
+					this.menuTitle = '[[#{계정 정보 수정}]]';
+					this.menuIcon = 'icon-people';
+            	},
+            	
+            	// main frame menuUrl 설정(2023.07.06)
+            	setMainMenu: function () {
+            		var authId = '[[${sa_account.getAuths()[0].getAuthId()}]]';
+            		
+            		if ('custMng' == authId) {
+            			this.menuUrl = "/v/business/cust/info";
+            			this.menuTitle = '[[#{사업장 정보 관리}]]';
+    					this.menuIcon = 'icon-cust';
+    					this.resourcesCd = 144;
+            		} else if ('storeMng' == authId) {
+            			this.menuUrl = "/v/business/order/list";
+            			this.menuTitle = '[[#{주문 관리}]]';
+    					this.menuIcon = 'icon-order';
+    					this.resourcesCd = 255;
+    					
+    					//this.handleSelect(255,255);
+    					
+            		} else {
+            			this.menuUrl = "/v/system/account/list";
+            			this.menuTitle = '[[#{계정 관리}]]';
+    					this.menuIcon = 'icon-account';
+    					this.resourcesCd = 13;
+            		}
+            		
+            	},
+				// 로그아웃
+				//TODO# 로컬
+				 //logout: function() { location.href = 'http://localhost:8185/login'; },
+				//TODO# 개발
+				// logout: function() { location.href = 'http://172.16.10.6:8181/mer/Login.do'; },
+				//TODO# 운영
+				logout: function() { location.href = 'https://admin.menuplus.kr/login'; },
+				//logout: function() { location.href = 'https://admin.innopay.co.kr/mer/Login.do'; },
+				
+				// 메뉴 선택 이벤트
+				handleSelect: function (resourcesCd, resourcesCds) {
+					
+					console.log("==================resourcesCd:" + resourcesCd);
+					console.log("==================resourcesCds:" + resourcesCds);
+					
+					if (this.resourcesCd == resourcesCd) {
+						return;
+					}
+					
+					this.contents_loading = true;
+					
+					var depth = 0;
+					var menu = null;
+					
+					// 1차 메뉴
+					for (var i = 0, len = this.menuList.length; i < len; i++) {
+						if (resourcesCds[depth] === this.menuList[i].resourcesCd) {
+							depth++; if (depth == resourcesCds.length) { menu = this.menuList[i]; break; }
+							// 2차 메뉴
+							for (var j = 0, jlen = this.menuList[i].subMenu.length; j < jlen; j++) {
+								if (resourcesCds[depth] === this.menuList[i].subMenu[j].resourcesCd) {
+									depth++; if (depth == resourcesCds.length) { menu = this.menuList[i].subMenu[j]; break; }
+								}
+							}
+						}
+					}
+					
+					setTimeout(function () {
+						this.menuUrl = menu.url;
+						this.resourcesCd = menu.resourcesCd;
+						this.menuTitle = menu.menuNmLan;
+						this.menuIcon = menu.menuIcon;	
+					}.bind(this), 200);
+				},
+				// Loading 표시
+				showLoading: function() {
+					this.loading_ = this.$loading({
+		                lock: true,
+		                text: this.appMsg.loadingMsg,
+		                spinner: 'el-icon-loading',
+		                background: 'rgba(0, 0, 0, 0.7)'
+		            });
+				},
+				// Loading 닫기
+				closeLoading: function() {
+					if (null != this.loading_) this.loading_.close();
+				},
+				// 메뉴 
+				menuCollapse: function() {
+					this.menuIsCollapse = !this.menuIsCollapse;
+					
+					if (this.menuIsCollapse) {
+						this.showTitle = false;
+						this.logo_animation = "logo_animation_collapse";
+						this.title_animation = "title_collapse";
+					} else {
+						this.logo_animation = "logo_animation_expand";
+						this.title_animation = "title_expand";
+						setTimeout(function () {
+							this.showTitle = true;
+						}.bind(this), 400);
+					}
+				},
+				// 공지사항 조회 해서 보여주기
+				showNoti: function () {
+					this.$axios.search("/noti/showNotiData", null, function (result) {
+						// 쿠키에서 숨심 공지 체크해서 걸러줌
+						var arr, reg = new RegExp("(^| )noti=([^;]*)(;|$)");
+						var disabledNotis = "";
+						
+						if (arr = document.cookie.match(reg)) {
+							disabledNotis = unescape(arr[2]);
+						}
+						
+						var tmp = [];
+						
+						for (var i = 0, len = result.length; i < len; i++) {
+							if (disabledNotis.indexOf("," + result[i].notiCd) == -1) {
+								tmp.push(result[i]);
+							}
+						}
+						
+						if (tmp.length > 0) {
+							this.notiDialogVisible = true;
+							this.notiData = tmp;
+						}
+					}.bind(this), false);
+				},
+				/* 그리드 공통코드 설정 */
+				formatterCode: function (row, column, cellValue, index) {
+					if (code.hasOwnProperty(column.property)) {
+						for (var i = 0, len = code[column.property].length; i < len; i++) {
+							if (cellValue == code[column.property][i].value) {
+								return code[column.property][i].label;
+							}
+						}
+					}
+					
+					return cellValue;
+				},
+				/* 수자 콤마 추가 */
+				formatterNum: function (row, column, cellValue, index) {
+					return null != cellValue && "" != cellValue ? parseInt(cellValue).toLocaleString() : cellValue;
+				},
+				/* 금액 콤마 추가 */
+				formatterPrice: function (row, column, cellValue, index) {
+					return (null != cellValue && "" != cellValue ? parseInt(cellValue).toLocaleString() : cellValue) + ' ';
+				},
+				/* 퍼센트 추가 */
+				formatterPercent: function (row, column, cellValue, index) {
+					return (null != cellValue && "" != cellValue ? parseInt(cellValue).toLocaleString() : cellValue) + ' %';
+				},
+				
+				/** 휴대전화번호 마스킹*/
+				formatterCellPhoneMasking: function (row, column, cellValue, index) {
+					if(null != cellValue && "" != cellValue){
+						
+						if(cellValue.length == 10){
+							return cellValue.substr(0,3) + "-" + "***" + "-" + cellValue.substr(6);
+						}else if(cellValue.length == 11){
+							return cellValue.substr(0,3) + "-" + "****" + "-" + cellValue.substr(7);
+						}else{
+							return cellValue;
+						} 
+						
+					}else{
+						return "";
+					}
+				},
+				
+				initOrderMessage: function (){	//1분마다 체크하여 주문상태가 '주문접수'인 건수가 있으면 메시지 보여준다.(23.10.06)					
+					var authId = '[[${sa_account.getAuths()[0].getAuthId()}]]';            		
+					var storeId = null;
+					
+					if ('storeMng' == authId) {
+						storeId = '[[${storeId}]]';
+					}
+					
+           			this.$axios.search("/order/orderSearchCnt", { storeId: storeId }, function (result) {
+           				
+           				console.log('========orderSearchCnt:' + result );
+           				
+           				if(result > 0){
+           					
+           					this.$notify({
+        						title: '[[#{주문 통지}]]',
+        						dangerouslyUseHTMLString: true,
+        						message: result + "건의 주문이 대기중입니다.",
+        						position: 'bottom-right',
+        						duration: 10000//60000
+        					});
+           					
+           					//window.open("http://localhost:8185/message?orderCnt=1","messageWindow","left=100,top=100,width=320,height=200");
+        					window.open("https://admin.menuplus.kr/message?orderCnt=" + result,"messageWindow","left=100,top=100,width=320,height=320");
+           					
+        					this.orderAutoSearch();     
+        					this.speakText(result + "건의 주문이 대기중입니다."); 
+        					//document.getElementById('audio').play();
+        					
+        					setTimeout( function (){
+           						this.initOrderMessage();
+           						}.bind(this), 60000)
+           					
+           				}else{
+           					setTimeout( function (){
+           						this.initOrderMessage();
+           						}.bind(this), 60000)
+           				}
+   						
+   					}.bind(this), false);
+					
+				},
+				
+				//TTS(문자를 음성으로 전환) 기능(24.02.21)
+				speakText: function(text){
+					if (typeof SpeechSynthesisUtterance === "undefined" || typeof window.speechSynthesis === "undefined") {
+						alert("이 브라우저는 음성 합성을 지원하지 않습니다.")
+						return;
+					}
+
+					window.speechSynthesis.cancel(); // 현재 읽고있다면 초기화
+
+					const speechMsg = new SpeechSynthesisUtterance()
+					speechMsg.rate =  1; // 속도: 0.1 ~ 10      
+					speechMsg.pitch = 1; // 음높이: 0 ~ 2
+					speechMsg.lang = "ko-KR";
+					speechMsg.text = text;
+
+					// SpeechSynthesisUtterance에 저장된 내용을 바탕으로 음성합성 실행
+					window.speechSynthesis.speak(speechMsg);
+				},
+				
+				initWebSocket: function () {
+
+					//this.websock = new WebSocket("ws://" + "10.10.10.14:8185" + "/websocket/[[${storeId}]]/1");
+ 					this.websock = new WebSocket("wss://admin.menuplus.kr" + "/websocket/[[${storeId}]]/1"); // AWS 서버
+ 					//this.websock = new WebSocket("wss://43.200.233.84:8185" + "/websocket/[[${storeId}]]/1"); // AWS 서버
+					this.websock.onopen = this.websocketOpen;
+					this.websock.onmessage = this.websocketMessage;
+					this.websock.onclose = this.websocketClose;
+					this.websock.onerror = this.websocketError;
+					
+					console.log('websock:' + this.websock.onopen);
+					console.log('websock.onmessage:' + this.websocketMessage);
+					
+				},
+				websocketOpen: function () {},
+				websocketMessage: function (event) {
+					this.$notify({
+						title: '[[#{주문 통지}]]',
+						dangerouslyUseHTMLString: true,
+						message: event.data,
+						position: 'bottom-right',
+						duration: 10000//60000
+					});
+					
+					this.orderAutoSearch();
+					
+					document.getElementById('audio').play();
+				},
+				websocketClose: function () {
+// 					if (this.websock.readyState != this.websock.OPEN) {
+// 						this.initWebSocket();
+// 					}
+				},
+				websocketError: function () {
+					if (this.websock.readyState != this.websock.OPEN) {
+						this.initWebSocket();
+					}
+				},
+				isNew: function (startDtm) {
+					var sdtm = new Date(startDtm);
+					var nowdtm = new Date();
+					
+					if (sdtm.getTime() > nowdtm.getTime() - 1000 * 60 * 60 * 24 * 1) {
+						return true;	
+					} else {
+						return false;
+					}
+				},
+				notiDisabled: function () {
+					var value = "";
+					
+					// 쿠키에서 숨심 공지 체크해서 걸러줌
+					var arr, reg = new RegExp("(^| )noti=([^;]*)(;|$)");
+					
+					if (arr = document.cookie.match(reg)) {
+						value = unescape(arr[2]);
+					}
+					
+					for (var i = 0, len = this.notiData.length; i < len; i++) {
+						value += "," + this.notiData[i].notiCd;
+					}
+					
+					// 쿠키에 안보는 공지코드 저장 함
+					var exp = new Date();
+					exp.setTime(exp.getTime() + 365*24*60*60*1000);
+					document.cookie = "noti="+ escape(value) + ";expires=" + exp.toGMTString();
+					
+					this.notiDialogVisible = false;
+				},
+		        // 주문 통지 시 자동주문조회
+		        orderAutoSearch: function () {}
+		    }
+		});
+	/*]]>*/
+	</script>
+	
+</body>
+</html>

@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:include="main/import :: head"></head>
+<body>
+	<style type="text/css">
+		.el-card__header, .el-card__body {
+			padding: 10px 20px;
+		}
+		.el-col-num {
+			text-align: right;
+		}
+	</style>
+	<div id="app" class="contain">
+		<!-- 검색 조건 -->
+		<div class="search_form" ref="search_form">
+			<el-form :inline="true" :model="searchForm" label-width="110px" label-suffix=":" :size="size" @submit.native.prevent>
+				<el-row>
+					<el-col :span="24">
+						<el-form-item th:label="#{기간}">
+							<el-date-picker v-model="sedtm" type="datetimerange" clearable="true" unlink-panels style="width: 360px;" :default-time="['06:00:00', '23:00:00']"
+									th:start-placeholder="#{날자 선택}" th:end-placeholder="#{날자 선택}" value-format="yyyy-MM-dd HH:mm:ss"></el-date-picker>
+									
+							<el-checkbox v-model="searchForm.autoEdtm" th:label="#{마감 시간 자동 갱신}" style="margin-left: 10px;"></el-checkbox>
+						</el-form-item>
+					</el-col>
+					<el-col :span="10">
+						<el-form-item th:label="#{주문 취소 여부}">
+							<combo :data="mainVue.code.cancelYn" :model="searchForm.cancelYn" @change="searchForm.cancelYn = $event"></combo>
+						</el-form-item>
+					</el-col>
+					<el-col :span="14">
+						<el-form-item th:label="#{주문 상태}">
+							<mcode-combo :data="orderStatus" :model="orderStatusCds" @change="orderStatusCds = $event" style="width: 500px;"></mcode-combo>
+						</el-form-item>
+					</el-col>
+				</el-row>
+			</el-form>
+		</div>
+		
+		<!-- 버튼-->
+		<div class="buttons" ref="buttons">
+			<el-button th:if='${sa_actions.contains("OrderForStoreSearch")}' :size="size" th:text="#{검색}" @click="search" icon="el-icon-search" ></el-button>
+			<el-button th:if='${sa_actions.contains("OrderForStoreSearch")}' :size="size" @click="handleExpand">{{ !expand ? "[[#{보기}]]" : "[[#{접기}]]" }}</el-button>
+			<!-- <el-switch v-model="autoSearch" th:active-text="#{주문통지 시 자동 새로 검색}" style="margin-left: 30px;"></el-switch> -->
+			
+<!-- 			<el-button @click="del" th:text="#{삭제}"></el-button> -->
+		</div>
+		
+		<!-- 리스트 -->
+		<el-table :height="tableHeight - 48" class="order_info_table" border stripe highlight-current-row tooltip-effect="dark"
+			ref="refTable" :data="tablePageData.content"
+			:size="size" th:empty-text="#{데이타 없음}"
+			@row-click="handleRowClick" @row-dblclick="handleRowDbClick"
+			
+			@select="handleRowChecked" @select-all="handleRowChecked"
+			
+			row-key="orderCd" :default-expand-all="expand">
+			
+				<el-table-column :label="String(tablePageData.totalElements)" type="index" 	width="55" align="center"
+					sortable label-class-name="data_cnt" :index="(index) => 1 + index + searchForm.currPage * searchForm.pageSize"></el-table-column>
+				<el-table-column type="selection" width="45" align="center"></el-table-column>
+				<el-table-column type="expand">
+					<template slot-scope="props">
+						<el-steps :active="props.row.orderStatus.ord" finish-status="success" align-center>
+							<el-step v-for="item in orderStatus" :key="item.cd" :title="item.nmLan"></el-step><!-- 배달이 아니면 배달 상태 숨김 -->
+						</el-steps>
+						<el-row :gutter="10">
+							<el-col :span="24" v-for="item in props.row.smenus" :key="item" style="margin-top: 20px;width:900px;">
+								<el-card shadow="hover">
+									<div slot="header">
+										<el-row>
+											<el-col :span="6">{{ item.category.categoryNmLan }}</el-col>
+											<el-col :span="6">{{ item.smenuNmLan }}</el-col>
+											<el-col :span="6" class="el-col-num">{{ mainVue.formatterNum(null, null, item.price, null) }}</el-col>
+											<el-col :span="6" class="el-col-num">{{ item.cnt }}</el-col>
+										</el-row>
+										
+										<el-row v-for="discount in item.discounts" :key="discount" style="margin-top: 5px;">
+											<el-col :span="6">&nbsp;</el-col>
+											<el-col :span="6">{{ discount.discountNmLan }}</el-col>
+											<el-col :span="6" class="el-col-num">{{
+												'price' == discount.discountTp.val ?
+													discount.price : discount.percente + '%' }}
+											</el-col>
+										</el-row>
+									</div>
+									
+									<el-row v-for="opt in item.smenuOpts" :key="opt" style="margin-bottom: 5px;">
+										<el-col :span="6">&nbsp;</el-col>
+										<el-col :span="6">{{ opt.smenuOptNmLan }}</el-col>
+										<el-col :span="6" class="el-col-num">{{ mainVue.formatterNum(null, null, opt.price, null) }}</el-col>
+										<el-col :span="6" class="el-col-num">{{ opt.cnt * item.cnt }}</el-col>
+									</el-row>
+								</el-card>
+							</el-col>
+						</el-row>
+					</template>
+				</el-table-column>
+				
+				<!-- 
+				주문 -> 접수 -> 주방접수 -> 준비완료 -> 배달중 -> 배달완료
+주문 -> 접수 -> 주방접수(있을수도 있고 없을수도 있고) -> 준비완료 -> 픽업완료 (포장 주문 시 )
+주문 -> 접수 -> 주방접수(y/n) -> 준비완료 -> 배달중 -> 배달완료 (배달 주문 시)
+				 -->
+				 
+				<el-table-column label="대기 시간(분)" 	min-width="60" align="right" >
+					<template slot-scope="scope">
+					
+						<div v-if="'ORDER' == scope.row.orderStatus.val">
+							<combo :data="mainVue.code.wait_time" :model="scope.row.waitTime"  @change="scope.row.waitTime = $event"></combo>
+						</div>
+						<div v-else>
+							<span>{{scope.row.waitTime}}</span>
+						</div>
+						
+					</template>
+				</el-table-column> 
+				 
+				<el-table-column th:label="#{주문 상태}" align="center" width="110">
+					<template slot-scope="scope">
+
+						<div  v-if="scope.row.cancelYn == 'N'">
+							<!-- 앱 주문 배달 이면서 결제 안된거면 상태변경 안됨 -->
+							<div v-if="'N' == scope.row.payYn && null != scope.row.appUser">
+								<span th:text="#{미결제}"></span>
+							</div>
+							
+							<div v-else>
+								<el-button size="mini" type="primary" @click="changeOrderStatus(scope.row, 'READY')" th:text="#{주문접수}" v-if="'ORDER' == scope.row.orderStatus.val" ></el-button>
+								
+								<!-- <el-button size="mini" type="success" @click="changeOrderStatus(scope.row, 'READY')" th:text="#{접수}" v-if="'RECEIPT' == scope.row.orderStatus.val"></el-button> -->
+							
+								<el-button size="mini" type="warning" @click="changeOrderStatus(scope.row, 'OVER')" th:text="#{준비중}" v-if="'READY' == scope.row.orderStatus.val"></el-button>
+								
+								<!-- <el-button size="mini" type="success" @click="changeOrderStatus(scope.row, 'OVER')" th:text="#{배달중}" v-if="'DELIVERY' == scope.row.orderStatus.val"></el-button> -->
+								
+								<span th:text="#{완료}" v-if="'OVER' == scope.row.orderStatus.val"></span>
+							</div>
+						</div>
+						
+					</template>
+				</el-table-column>
+				
+				<el-table-column th:label="#{주문 취소}" align="center" width="110">
+					<template slot-scope="scope">
+						
+						<div v-if="'OVER' != scope.row.orderStatus.val">
+							<div>
+								<el-button size="mini" type="info" @click="cancelPass(scope.row.orderCd,scope.row.orderId)" th:text="#{주문 취소}" v-if="scope.row.cancelYn == 'N'"></el-button>
+								<!-- <span th:text="#{주문 취소 됨}" v-else></span> -->
+							</div>
+						</div>
+						<div v-else>
+							<span th:text="#{주문 취소 됨}" v-if="scope.row.cancelYn == 'Y'"></span>
+						</div>
+						
+					</template>
+				</el-table-column> 
+				
+<!-- 				<el-table-column th:label="#{주문 cd}" 	prop="orderCd" 		min-width="80" align="center"></el-table-column> -->
+				<!-- <el-table-column th:label="#{주문 번호}" 	prop="orderCd" 		min-width="80" align="center"></el-table-column> -->
+				<el-table-column th:label="#{주문 시간}" 	prop="orderDate" 	min-width="150" align="center"></el-table-column>				
+				<el-table-column th:label="#{객실명}" 	prop="storeRoom.storeRoomNm" 	min-width="100" align="center"></el-table-column>
+				<!-- <el-table-column th:label="#{객실 명}"   min-width="100" align="center">
+					<template slot-scope="scope">
+						<el-row style="text-align: center; ">
+							<el-col>
+								<div>{{ scope.row.storeRoom.storeRoomNm }}</div>	
+							</el-col>
+						</el-row>					
+					</template>
+				</el-table-column> -->
+				<el-table-column th:label="#{전화}" 	prop="tel" min-width="100" align="center" :formatter="mainVue.formatterCellPhoneMasking"></el-table-column>
+				<el-table-column th:label="#{주문자}" 	prop="guestName" min-width="100" align="center"></el-table-column>
+				<el-table-column th:label="#{결제 금액}" 	prop="amt" 			min-width="80" align="right" :formatter="mainVue.formatterPrice"></el-table-column>
+				
+				<!-- <el-table-column th:label="#{판매 방식}" 	prop="salesTp.nmLan" min-width="80" align="center"></el-table-column> -->
+				<!-- <el-table-column th:label="#{주소}" 		prop="orderAddr" min-width="200" align="center"></el-table-column> -->
+				<!-- <el-table-column th:label="#{주문 상태}" 	prop="orderStatus.nmLan" min-width="80" align="center"></el-table-column> -->
+				<!-- <el-table-column th:label="#{결제 여부}" 	prop="payYn" 		min-width="80" align="center" :formatter="mainVue.formatterCode"></el-table-column> -->				
+				<!-- <el-table-column th:label="#{할인 정보}" 	prop="discountNms" 	min-width="150" align="left" show-overflow-tooltip></el-table-column> -->
+				<!-- <el-table-column th:label="#{주문 설명}" 	prop="orderDesc" 	min-width="300" show-overflow-tooltip></el-table-column> -->
+			</el-table>
+			
+			<el-dialog title="주문 취소" :visible.sync="dialogFormVisible" width="40%">
+				<el-form :model="inputForm" label-width="80px" label-suffix=":" :size="size" @submit.native.prevent>
+					<el-row :gutter="20">
+						<el-col :span="24">
+							<el-tabs value="info">
+								<el-tab-pane th:label="#{기본 정보}" name="info">
+									<el-row :gutter="20">
+										<el-col :span="24">
+											<el-form-item th:label="#{취소사유}" required>
+												<el-radio v-model="cancelReason" label="90">품절 또는 재료소진</el-radio>
+												<el-radio v-model="cancelReason" label="91">고객의 주문 실수</el-radio>
+												<el-radio v-model="cancelReason" label="92">고객의 환불 요청</el-radio>
+											</el-form-item>
+											
+											<el-form-item th:label="#{비밀번호}" required>
+												<el-input type="password" v-model="cancelPw" placeholder="비밀번호입력" width="50%"></el-input>
+											</el-form-item>
+										</el-col>
+									</el-row>
+								</el-tab-pane>
+							</el-tabs>
+						</el-col>
+						
+					</el-row>
+				</el-form>
+				<div slot="footer" class="dialog-footer">							
+					<el-button size="mini" type="info" @click="del(Cd,Id,cancelPw,cancelReason)" th:text="#{주문 취소}"></el-button>
+				</div>		 							
+			</el-dialog>
+			
+			<el-pagination background layout="prev, pager, next, jumper, ->, sizes, total"
+				:page-sizes="[30, 50, 100]" :page-size="searchForm.pageSize" :current-page="searchForm.currPage+1" :total="tablePageData.totalElements"
+				@current-change="searchForm.currPage = $event-1; search()" @size-change="searchForm.pageSize = $event; search()"></el-pagination>
+		<!-- /el-row -->
+	</div>
+	
+	<script type="text/javascript" charset="UTF-8">
+	
+	/*<![CDATA[*/
+		new Vue({
+			el: '#app',
+			data: function () {
+				var data = parent.mainVue.initData();
+				data.url = "/order";
+				data.searchForm = this.initSearchForm();
+				data.sedtm = [util.getDate('yyyy-MM-dd HH:mm:ss', util.dateAdd('d ', -1, new Date())),
+					util.getDate('yyyy-MM-dd HH:mm:ss', new Date())];
+				data.cancelPw  = ""
+				data.cancelReason  = "90";
+				data.orderStatus = [];
+				data.orderStatusCds = [];
+				data.Cd = 0;
+				data.expand = false;
+				
+				data.tablePageData = {
+					totalElements: 0,
+					content: []
+				};
+				
+				data.autoSearch = true;
+				
+				data.inputForm = this.initInputForm();
+				
+				return data;
+			},
+			created: function () {
+				console.log('created order');
+				this.initOrderStatus();				
+
+				console.log('orderStatusCds :' + this.orderStatusCds);
+
+				this.autoSearch = true;
+				//this.autoSearch = util.getCookie("autoSearch");
+
+				console.log('autoSearch :' + this.autoSearch);
+				
+
+			},
+			mounted: function () {
+				setTimeout(function () {
+
+					console.log('mounted');
+
+					this.$nextTick(function () {
+						this.mainVue.currVue = this;
+					}.bind(this));
+					
+					this.mainVue.orderAutoSearch = this.orderAutoSearch;
+					this.search();
+					
+				}.bind(this), 500);
+			},
+			watch: {
+				autoSearch: function (oldVal, newVal) {
+					console.log('watch');
+					console.log('autoSearch:' + this.autoSearch );
+					util.setCookie("autoSearch", this.autoSearch, 365);
+				}
+			}, 
+			methods: {
+				// 검색 조건 초기화
+				initSearchForm: function () {
+					return {
+						autoEdtm: true,
+						startDate: null,
+						endDate: null,
+						orderStatusCds: '',
+						cancelYn: 'N',
+						cancelPay: 'N',
+						pageSize: 30,
+						currPage: 0
+					}
+				},
+				
+				// 입력폼 초기화(대기시간 초기값 설정) 24.02.14
+				initInputForm: function () {
+					return {
+						waitTime: '5'
+					}
+				},
+
+				// 그리드 선택 이벤트
+				handleRowClick: function (val) {
+					this.selectData = val;
+					this.$refs.refTable.toggleRowExpansion(val, true);
+				},
+				// 그리드 두번 클릭 이벤트
+				handleRowDbClick: function (val) {
+					this.$refs.refTable.toggleRowExpansion(val, false);
+				},
+				handleExpand: function () {
+					this.expand = !this.expand;
+					
+					for (var i = 0, len = this.$refs.refTable.tableData.length; i < len; i++) {
+						this.$refs.refTable.toggleRowExpansion(this.$refs.refTable.tableData[i], this.expand);
+					}
+				},
+				// 체크 박스 체크 이벤트
+				handleRowChecked: function (selection, row) {
+					if (selection.length > 0) {
+						this.btn.delDisabled = false;	
+					} else {
+						this.btn.delDisabled = true;
+					}
+					
+					this.checkedData = [];
+					
+					for (var i = 0, len = selection.length; i < len; i++) {
+						this.checkedData[this.checkedData.length] = selection[i].orderCd;
+					}
+				},
+				// 주문 상태 데이타 초기화
+				initOrderStatus: function () {
+					this.mainVue.$axios.search("/code/getCode/ORDER_STATUS", null, function (result) {
+						this.orderStatus = result;
+						
+						
+						
+						// 기본 건색 상태 설정
+						for (var i = 0, len = this.orderStatus.length; i < len; i++) {
+
+							console.log('i =' + i , this.orderStatus[i].val);
+
+							if ('OVER' != this.orderStatus[i].val) {
+								this.orderStatusCds.push(this.orderStatus[i]);								
+							}
+						}
+						
+						console.log('this.orderStatusCds :' + this.orderStatusCds);
+
+					}.bind(this));
+				},
+				// 조회
+				search: function () {
+					if (null == this.sedtm || this.sedtm.length < 2) {
+						this.mainVue.$message({ type: 'error', message: "[[#{기간을 선택 하여 주십시오.}]]" });
+						return;
+					}
+					
+					console.log("==========startDate:" + this.sedtm[0]);
+					
+					this.searchForm.startDate = this.sedtm[0];
+					
+					if (this.searchForm.autoEdtm) {
+						this.sedtm = [this.sedtm[0], util.getDate('yyyy-MM-dd HH:mm:ss', new Date())]
+					}
+					
+					this.searchForm.endDate = this.sedtm[1];
+					
+					var tmp = [];
+					for (var i = 0, len = this.orderStatusCds.length; i < len; i++) {
+						tmp.push(this.orderStatusCds[i].cd);	
+					}
+					
+					this.searchForm.orderStatusCds = tmp.join(',');
+					
+					// 총 카운터 조회
+					this.mainVue.$axios.search(this.url, this.searchForm, function (result) {
+						console.log(result)
+						this.searchForm.currPage = result.number;
+						this.tablePageData = result;
+					}.bind(this));
+				},
+				// 주문 취소
+				del: function (orderCd,orderId,cancelPw,cancelReason) {
+					
+					if(cancelPw == ''){
+						this.mainVue.$message({ type: 'error', message: "[[#{주문취소 비밀번호를 입력하세요.}]]" });
+						return;
+					}
+					
+					this.mainVue.$confirm("[[#{주문 취소하시겠습니까? 이미 결제된 주문은 자동 환불 처리 됩니다.}]]", this.mainVue.appMsg.systemAlterTitle, {
+				          confirmButtonText: "[[#{주문 취소}]]",
+				          cancelButtonText: "[[#{취소}]]",
+				          type: 'info'
+				        }).then(function (result) {
+				        	this.mainVue.$axios.get(this.url + "/delOrder/" + orderCd + "/" + orderId + "/" + cancelPw + "/" + cancelReason , function (result) {
+								alert(result.resultMsg);
+								this.dialogFormVisible = false;
+				        		this.search();
+							}.bind(this));
+				        }.bind(this)).catch(function () {
+				        	
+				        }.bind(this));
+				},
+				// 결제 취소
+				cancelPay: function (orderCd) {
+					this.mainVue.$confirm("[[#{결제 취소하시겠습니까?}]]", this.mainVue.appMsg.systemAlterTitle, {
+				          confirmButtonText: "[[#{결제 취소}]]",
+				          cancelButtonText: "[[#{취소}]]",
+				          type: 'info'
+				        }).then(function () {
+				        	this.mainVue.$axios.get(this.url + "/cancelPay/" + orderCd, function (result) {
+				        		this.mainVue.$message({ type: 'success', message: "[[#{결제 취소 성공}]]" });
+				        		this.search();
+							}.bind(this));
+				        }.bind(this)).catch(function () {
+				        	this.mainVue.$message({ type: 'info', message: "[[#{취소 성공}]]" });
+				        }.bind(this));
+				},
+				changeOrderStatus: function (row, orderStatusVal) {
+					
+					// ready 상태일때만 대기시간 설정 여부를 체크한다.(24.02.14)
+					if(orderStatusVal == 'READY' && row.waitTime == null){
+						this.mainVue.$message({ type: 'error', message: "[[#{대기시간을 선택하세요.}]]" });
+						return;
+					}
+					
+					//대기시간 waitTime 추가(24.02.14)
+					this.mainVue.$axios.add(this.url + '/status/result/' + row.orderCd + '/' + row.waitTime + '/' + orderStatusVal, null, null, function (result) {
+						this.mainVue.$message({ type: 'success', message: "[[#{처리 되었습니다.}]]" });
+		        		this.search();
+					}.bind(this));
+				},
+				orderAutoSearch: function () {
+					if (this.autoSearch) {
+						this.searchForm.cancelYn = 'N';
+						this.search();
+					}
+				},
+				cancelPass(orderCd,orderId){
+					this.dialogFormVisible = true;
+					this.Cd = orderCd;
+					this.Id = orderId;
+				},
+				
+				
+// 				// 체크 박스 체크 이벤트
+// 				handleRowChecked: function (selection, row) {
+// 					this.checkedData = [];
+					
+// 					for (var i = 0, len = selection.length; i < len; i++) {
+// 						this.checkedData[this.checkedData.length] = selection[i].orderCd;
+// 					}
+// 				},
+// 				// 삭제
+// 				del: function () {
+// 		        	this.mainVue.$axios.del(this.url + "/del/" + this.checkedData.join(","), function (result) {
+// 		        		this.mainVue.$message({ type: 'success', message: "[[#{삭제 성공}]]" });
+// 		        		this.search();
+// 					}.bind(this));
+// 				}
+		    }
+		});
+	/*]]>*/
+	</script>
+</body>
+</html>

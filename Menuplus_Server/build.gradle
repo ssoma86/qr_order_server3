@@ -1,0 +1,141 @@
+buildscript {
+	ext {
+		springBootVersion = '2.2.0.RELEASE'
+	}
+	repositories {
+		mavenCentral()
+	}
+	dependencies {
+		classpath("org.springframework.boot:spring-boot-gradle-plugin:${springBootVersion}")
+	}
+}
+
+
+plugins {
+	id 'org.springframework.boot' version '2.2.0.RELEASE'
+	id 'io.spring.dependency-management' version '1.0.8.RELEASE'
+	id 'java'
+}
+
+
+group = 'menuplus'
+version = '0.6.1'
+//sourceCompatibility = '1.8'
+
+
+apply plugin: 'io.spring.dependency-management'
+apply plugin: 'war'
+apply plugin: 'eclipse'
+
+
+bootWar { 
+	archiveBaseName = 'menuplus'
+	archiveFileName = 'menuplus.war'
+	archiveVersion = '0.0.1'
+}
+
+
+war {
+	archiveBaseName = 'menuplus'
+	archiveFileName = 'menuplus.war'
+}
+
+test.enabled = false
+bootWar.enabled = false
+war.enabled = true
+
+configurations {
+	developmentOnly
+	runtimeClasspath {
+		extendsFrom developmentOnly
+	}
+	compileOnly {
+		extendsFrom annotationProcessor
+	}
+}
+
+repositories {
+	mavenCentral()
+	maven { url 'https://repo.spring.io/milestone' }
+}
+
+ext {
+	set('springCloudVersion', "Hoxton.M3")
+}
+
+dependencies {
+	implementation fileTree(dir: 'libs', includes:['*jar'])
+
+	implementation 'org.springframework.boot:spring-boot-starter-web'
+	implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
+	implementation 'org.springframework.boot:spring-boot-starter-security'
+	implementation 'org.springframework.cloud:spring-cloud-starter-oauth2'
+	implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
+	implementation 'org.springframework.boot:spring-boot-starter-websocket'
+	implementation 'org.springframework.boot:spring-boot-starter-validation'
+	implementation 'org.springframework.boot:spring-boot-starter-aop'
+	implementation 'org.springframework.boot:spring-boot-starter-cache'
+
+	implementation group: 'org.hibernate', name: 'hibernate-ehcache'
+	
+	implementation 'org.springframework.boot:spring-boot-starter-mail'
+	
+	implementation group: 'mysql', name: 'mysql-connector-java', version: '5.1.49'
+	implementation group: 'commons-dbcp', name: 'commons-dbcp', version: '1.4'
+	implementation group: 'commons-lang', name: 'commons-lang', version: '2.6'
+	implementation group: 'com.google.code.gson', name: 'gson', version: '2.8.0'
+	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+	
+	implementation group: 'org.springframework.data', name: 'spring-data-jpa', version: '2.2.5.RELEASE'
+	//implementation group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: '2.13.4'
+	//implementation group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: '2.13.4'
+	//implementation group: 'com.fasterxml.jackson.core', name: 'jackson-annotations', version: '2.13.4'
+	//implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-jdk8', version: '2.13.4'
+	//implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-jsr310', version: '2.13.4'
+	//implementation group: 'com.fasterxml.jackson.module', name: 'jackson-module-parameter-names', version: '2.13.4'
+	
+	implementation 'com.google.firebase:firebase-admin:9.2.0' 
+	//implementation group: 'com.squareup.okhttp3', name: 'okhttp', version: '4.1.0'
+	
+	implementation group: 'com.github.fernandospr', name: 'javapns-jdk16', version: '2.3.1'
+	
+	implementation group: 'org.apache.poi', name: 'poi', version: '4.1.0'
+	implementation group: 'org.apache.poi', name: 'poi-ooxml', version: '4.1.0'
+	
+	compileOnly('org.springframework.boot:spring-boot-configuration-processor')
+	//TODO# Live Reload↓ (로컬 개발 핫스왑 기능)
+//	runtimeOnly('org.springframework.boot:spring-boot-devtools')
+
+	//TODO# intellij
+	compileOnly 'javax.interceptor:javax.interceptor-api:1.2'
+	compile group: 'com.google.code.gson', name: 'gson', version: '2.8.6'
+	compileOnly 'org.projectlombok:lombok'
+
+	providedRuntime 'org.springframework.boot:spring-boot-starter-tomcat'//,version: '8.5.91' 외부 톰캣 8버전 이상으로 적용해야 됨. 7버전에서는 인식을 못함.
+	
+	annotationProcessor 'org.projectlombok:lombok'
+	
+	implementation 'javax.servlet:jstl'    								//jsp사용을 위해 추가(23.12.29)
+	implementation "org.apache.tomcat.embed:tomcat-embed-jasper"		//jsp사용을 위해 추가(23.12.29)
+	implementation group: 'com.googlecode.json-simple', name: 'json-simple', version: '1.1.1'
+	
+}
+
+
+// profile의 기본값 dev로 설정
+	ext.profile = (!project.hasProperty('profile') || !profile) ? 'dev' : profile
+	
+//리소스 디렉토리 추가
+	sourceSets {
+	    main {
+	        resources {
+	            srcDirs "src/main/resources","src/main/resources-${profile}"
+	        }
+	    }
+	}
+
+dependencyManagement {
+	imports {
+		mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}"
+	}
+}

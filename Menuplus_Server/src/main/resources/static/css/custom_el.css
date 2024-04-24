@@ -1,0 +1,26 @@
+@CHARSET "UTF-8";
+
+/* */
+.el-loading-mask { background-color: rgba(255,255,255,1); }
+/* 하위 메뉴 스크롤 숨김 */
+.el-menu .el-menu { overflow-y: hidden; }
+/* 그리드 해더 중간 정열 */
+.el-table th > .cell { text-align: center }
+/* el-card 높이 설정 */
+.el-card__header { padding: 16px 20px; }
+.el-card__body { height: calc(100% - 90px); overflow: auto }
+/* 서브 그리드 위치 */
+.el-table__expanded-cell { padding: 10px 10px 10px 35px !important }
+/* 풀 스크린 다이어로그 일떄  radius 0 */
+.el-dialog.is-fullscreen { border-radius: 0px }
+/* 조회 수량 표시 */
+.el-badge-search-cnt > .el-badge__content.is-fixed { right: 70px }
+.avatar-uploader .el-upload { border: 1px dashed #d9d9d9; border-radius: 6px; cursor: pointer; position: relative; overflow: hidden; }
+.avatar-uploader .el-upload:hover { border-color: #409EFF; }
+.avatar-uploader-icon { font-size: 28px; color: #8c939d; width: 200px; height: 150px; line-height: 150px; text-align: center; }
+.avatar { width: 200px; height: 150px; display: block; }
+.table-img-cell { height: 50px; }
+.el-table .table-img-colunm { padding: 0 !important }
+.el-table .table-img-colunm .cell { padding-left: 0 !important; padding-right: 0 !important; line-height: 11px !important; }
+.el-pagination { border: 1px solid #EBEEF5; border-top: none; padding: 10px; }
+/* .el-input .el-input__count .el-input__count-inner { background: none; } */

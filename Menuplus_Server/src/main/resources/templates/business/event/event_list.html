@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:include="main/import :: head"></head>
+<body>
+	<div id="app" class="contain">
+		<!-- 검색 영역 -->
+		<div class="search_form" ref="search_form">
+			<el-form :inline="true" :model="searchForm" label-width="120px" label-suffix=":" :size="size" @submit.native.prevent>
+				<el-row>
+					<el-col :span="6">
+						<el-form-item th:label="#{언어}">
+							<lan-combo :data="lans" th:label="#{전체}" :model="searchForm.lanId" @change="searchForm.lanId = $event"></lan-combo>
+						</el-form-item>
+					</el-col>
+					<el-col :span="6">
+						<el-form-item th:label="#{사용 가능 여부}">
+							<combo :data="mainVue.code.useYn" th:label="#{전체}" :model="searchForm.useYn" @change="searchForm.useYn = $event"></combo>
+						</el-form-item>
+					</el-col>
+				</el-row>
+			</el-form>
+		</div>
+		
+		<!-- 버튼 -->
+		<div class="buttons" ref="buttons">
+			<el-button th:if='${sa_actions.contains("EventSearch")}' :size="size" th:text="#{검색}" @click="search" icon="el-icon-search" ></el-button>
+			<el-button th:if='${sa_actions.contains("EventAdd")}' :size="size" th:text="#{등록}" @click="add" icon="el-icon-circle-plus-outline" :disabled="btn.addDisabled" ></el-button>
+			<el-button th:if='${sa_actions.contains("EventUp")}' :size="size" th:text="#{수정}" @click="up" icon="el-icon-edit-outline" :disabled="btn.upDisabled" ></el-button>
+			<el-button th:if='${sa_actions.contains("EventDel")}' :size="size" th:text="#{삭제}" @click="del" icon="el-icon-remove-outline" :disabled="btn.delDisabled" ></el-button>
+			<el-button th:if='${sa_actions.contains("EventAdd") || sa_actions.contains("EventUp")}' :size="size" th:text="#{저장}" @click="save" icon="el-icon-check" :disabled="btn.saveDisabled" style="float: right;"></el-button>
+		</div>
+		
+		<!-- 리스트 -->
+		<el-row :gutter="20">
+			<el-col :span="12">
+				<el-table :height="tableHeight" border stripe highlight-current-row tooltip-effect="dark"
+						:data="tableData" :size="size" th:empty-text="#{데이타 없음}"
+						@row-click="handleRowClick" @select="handleRowChecked" @select-all="handleRowChecked">
+					<el-table-column :label="tableData.length" type="index" 	width="55" align="center" sortable fixed label-class-name="data_cnt"></el-table-column>
+					<el-table-column type="selection" 							width="45" align="center" fixed></el-table-column>
+					<el-table-column th:label="#{타이틀}" 	prop="eventTitle" 	min-width="200" sortable show-overflow-tooltip></el-table-column>
+					<el-table-column th:label="#{언어}" 		prop="lan.nm" 		width="90" align="center"></el-table-column>
+					<el-table-column th:label="#{시작일시}" 	prop="startDtm" min-width="150" align="center" sortable></el-table-column>
+					<el-table-column th:label="#{종료일시}" 	prop="endDtm" 	min-width="150" align="center" sortable></el-table-column>
+					<el-table-column th:label="#{사용 가능 여부}" prop="useYn" 	min-width="120" align="center" :formatter="mainVue.formatterCode"></el-table-column>
+				</el-table>
+			</el-col>
+			<el-col :span="12">
+				<el-card shadow="never" :style="{ height: inputHeight + 'px' }">
+					<div slot="header">
+						<span th:text="#{이벤트}"></span>
+						<span v-if="'I' == inputForm.statu" th:text="#{추가}"></span>
+						<span v-if="'U' == inputForm.statu" th:text="#{수정}"></span>
+					</div>
+					<div>
+						<el-form :model="inputForm" label-width="120px" label-suffix=":" :size="size" :disabled="fromDisabled" @submit.native.prevent>
+							<el-row>
+								<el-col :span="12">
+									<el-form-item th:label="#{언어}" :error="formError['lan.id']" required>
+										<lan-combo :data="lans" :model="inputForm.lan.id" @change="inputForm.lan.id = $event"></lan-combo>
+									</el-form-item>
+								</el-col>
+								<el-col :span="12">
+									<el-form-item th:label="#{사용 가능 여부}" required>
+										<combo :data="mainVue.code.useYn" :model="inputForm.useYn" @change="inputForm.useYn = $event"></combo>
+									</el-form-item>
+								</el-col>
+							</el-row>
+							<el-form-item th:label="#{기간}" :error="formError.startDtm" required>
+								<el-date-picker v-model="inputForm.seDtm" type="datetimerange" clearable="true" unlink-panels style="width: 360px;" :default-time="['06:00:00', '23:00:00']"
+									th:start-placeholder="#{날자 선택}" th:end-placeholder="#{날자 선택}" value-format="yyyy-MM-dd HH:mm:ss"></el-date-picker>
+							</el-form-item>
+							<el-form-item th:label="#{제목}" :error="formError.eventTitle" required>
+								<el-input v-model="inputForm.eventTitle" maxlength="50" clearable="true" show-word-limit></el-input>
+							</el-form-item>
+							
+							<el-form-item th:label="#{내용}" :error="formError.content" required>
+								<el-input type="textarea" v-model="inputForm.content" :autosize="{ minRows: 6, maxRows: 16 }"></el-input>
+							</el-form-item>
+							
+							<el-form-item th:label="#{링크}">
+								<el-input v-model="inputForm.link" maxlength="100" clearable="true" show-word-limit placeholder="http://"></el-input>
+							</el-form-item>
+							
+							<el-form-item th:label="#{이미지}">
+								<el-upload class="avatar-uploader" accept="image/*" :show-file-list="false"
+									:auto-upload="false" :on-change="imgChange">
+									<template v-if="inputForm.img || inputForm.imgFile">
+										<img :src="inputForm.imgFile" class="avatar"/>
+										<i class="el-icon-close" style="position: absolute; top: 5px; right: 5px;" @click.stop="imgRemove"></i>
+									</template>
+									<i v-else class="el-icon-plus avatar-uploader-icon"></i>
+								</el-upload>
+							</el-form-item>
+						</el-form>
+					</div>
+				</el-card>
+			</el-col>
+		</el-row>
+	</div>
+	
+    <script type="text/javascript">
+	/*<![CDATA[*/
+		new Vue({
+			el: '#app',
+			data: function () {
+				var data = parent.mainVue.initData();
+				data.url = "/event";
+				
+				data.lans = [];
+				
+				data.searchForm = this.initSearchForm();
+				data.inputForm = this.initInputForm();
+				data.formError = this.initFormError();
+				
+				// 업로드시 필요한 토큰
+				
+				
+				return data;
+			},
+			created: function () {
+				this.initLan();
+				this.search();
+			},
+			mounted: function () {
+				setTimeout(function () {
+					this.$nextTick(function () {
+						this.mainVue.currVue = this;
+					}.bind(this));	
+				}.bind(this), 500);
+			},
+			methods: {
+				// 검색 조건 초기화
+				initSearchForm: function () {
+					return {
+						lanId: '',
+						useYn: 'Y'
+					}
+				},
+				// 입력폼 초기화
+				initInputForm: function () {
+					return {
+						statu: 'I',
+						eventCd: 0,
+						lan: { id: null, nm: '' },
+						eventTitle: '',
+						content: '',
+						seDtm: [util.getNow('yyyy-MM-dd HH:mm:ss'),
+							util.getDate('yyyy-MM-dd HH:mm:ss', util.dateAdd('w ', 1, new Date()))],
+						startDtm: '',
+						endDtm: '',
+						useYn: 'Y',
+						link: '',
+						img: '',
+						imgFile: ''
+					}
+				},
+				// 오류 메세지 초기화
+				initFormError: function () {
+					return {
+						'lan.id': '',
+						eventTitle: '',
+						content: '',
+						startDtm: '',
+						endDtm: ''
+					}
+				},
+				// 그리드 선택 이벤트
+				handleRowClick: function (val) {
+					if (null != val) {
+						this.btn.upDisabled = false;
+					}
+					this.selectData = val;
+				},
+				// 체크 박스 체크 이벤트
+				handleRowChecked: function (selection, row) {
+					if (selection.length > 0) {
+						this.btn.delDisabled = false;	
+					} else {
+						this.btn.delDisabled = true;
+					}
+					
+					this.checkedData = [];
+					
+					for (var i = 0, len = selection.length; i < len; i++) {
+						this.checkedData[this.checkedData.length] = selection[i].eventCd;
+					}
+				},
+				// 언어 데이타 조회
+				initLan: function () {
+					this.mainVue.$axios.search("/language", null, function (result) {
+						this.lans = result;
+					}.bind(this), false);
+				},
+				// 추가
+				add: function () {
+					this.inputForm = this.initInputForm();
+					
+					this.inputForm.lan = this.lans.length > 0 ? util.copyObj(this.lans[0]) : { cd: null, nm: '' };
+					
+					this.formError = this.initFormError();
+					
+					this.btn.saveDisabled = false;
+					this.fromDisabled = false;
+				},
+				// 수정
+				up: function () {
+					this.mainVue.$axios.get(this.url + '/' + this.selectData.eventCd, function (result) {
+						result.statu = "U";
+						result.seDtm = [result.startDtm, result.endDtm];
+						
+						result.imgFile = result.img;
+						
+						this.inputForm = result;
+						
+						this.formError = this.initFormError();
+						
+						this.btn.saveDisabled = false;
+						this.fromDisabled = false;
+					}.bind(this), true);
+				},
+				// 조회
+				search: function () {
+					this.mainVue.$axios.search(this.url, this.searchForm, function (result) {
+						this.tableData = result;
+						
+						this.btn.addDisabled = false;
+						this.btn.upDisabled = true;
+						this.btn.delDisabled = true;
+						this.btn.saveDisabled = true;
+						this.fromDisabled = true;
+						
+						this.inputForm = this.initInputForm();
+						this.formError = this.initFormError();
+					}.bind(this), false);
+				},
+				// 삭제
+				del: function () {
+					this.mainVue.$confirm("[[#{{0}을 삭제 하시겠습니까?(#{이벤트})}]]", this.mainVue.appMsg.systemAlterTitle, {
+				          confirmButtonText: "[[#{삭제}]]",
+				          cancelButtonText: "[[#{취소}]]",
+				          type: 'info'
+				        }).then(function () {
+				        	this.mainVue.$axios.del(this.url + "/" + this.checkedData.join(","), function (result) {
+				        		this.mainVue.$message({ type: 'success', message: "[[#{삭제 성공}]]" });
+				        		this.search();
+							}.bind(this), true);
+				        }.bind(this)).catch(function () {
+				        	this.mainVue.$message({ type: 'info', message: "[[#{삭제 취소}]]" });
+				        }.bind(this));
+				},
+				// 저장
+				save: function () {
+					this.formError = this.initFormError();
+					
+					if (null == this.inputForm.seDtm || this.inputForm.seDtm.length < 2) {
+						this.formError.startDtm = "[[#{기간을 선택 하여 주십시오.}]]";
+						return;
+					}
+					
+					// 기간 설정
+					this.inputForm.startDtm = this.inputForm.seDtm[0];
+					this.inputForm.endDtm = this.inputForm.seDtm[1];
+					
+					if ('I' === this.inputForm.statu) {
+						this.mainVue.$axios.add(this.url, this.inputForm, this.formError, function (result) {
+							this.mainVue.$message({ type: 'success', message: "[[#{등록 성공}]]" });
+							this.search();
+						}.bind(this), true);
+					} else {
+						this.mainVue.$axios.up(this.url + "/" + this.inputForm.eventCd, this.inputForm, this.formError, function (result) {
+							this.mainVue.$message({ type: 'success', message: "[[#{수정 성공}]]" });
+							this.search();
+						}.bind(this), true);
+					}
+				},
+				// 이미지 선택
+				imgChange: function (file) {
+					util.imgToBase64(URL.createObjectURL(file.raw), file.raw.type, function (data, img) {
+						this.inputForm.imgFile = data;	
+					}.bind(this));
+				},
+				imgRemove: function () {
+					this.inputForm.img = '';
+					this.inputForm.imgFile = '';
+				}
+		    }
+		});
+	/*]]>*/
+	</script>
+</body>
+</html>

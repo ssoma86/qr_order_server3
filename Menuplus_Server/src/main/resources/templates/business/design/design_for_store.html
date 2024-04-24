@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:include="main/import :: head"></head>
+<body>
+	<div id="app" class="contain">
+		<!-- 검색 영역 -->
+		<div class="search_form" ref="search_form">
+			<el-form :inline="true" :model="searchForm" label-width="110px" label-suffix=":" :size="size" @submit.native.prevent>
+				<el-row>
+					
+					<el-col :span="10">
+						<el-form-item th:label="#{디자인 선택}">
+							<combo :data="mainVue.code.design" :model="inputForm.design" @change="inputForm.design = $event"></combo>
+						</el-form-item>
+					</el-col>
+					
+				</el-row>
+			</el-form>
+		</div>
+		
+		<!-- 버튼 -->
+		<div class="buttons" ref="buttons">
+			<el-button th:if='${sa_actions.contains("StoreDesign")}' :size="size" th:text="#{저장}" @click="save" icon="el-icon-circle-plus-outline" :disabled="btn.addDisabled" ></el-button>
+		</div>
+		
+		
+	
+    <script type="text/javascript">
+	/*<![CDATA[*/
+		new Vue({
+			el: '#app',
+			data: function () {
+				var data = parent.mainVue.initData();
+				
+				data.inputForm = this.initInputForm();
+				
+				return data;
+			},
+			created: function () {
+				this.initStore();
+			},
+			
+			mounted: function () {
+				setTimeout(function () {
+					this.$nextTick(function () {
+						this.mainVue.currVue = this;
+					}.bind(this));
+				}.bind(this), 500);
+			},
+		
+			methods: {
+				
+				// 입력폼 초기화
+				initInputForm: function () {
+					return {
+						design: 'V'
+						,storeCd: 0
+					}
+				},
+
+				initStore: function () {
+					this.mainVue.$axios.search('/store/getStore', null, function (result) {
+						this.inputForm.design = result.design;
+						this.inputForm.storeCd = result.storeCd;
+						
+					}.bind(this));
+				},
+				
+				// 저장
+				save: function () {					
+					this.mainVue.$axios.add('/store/design', this.inputForm, null, function (result) {
+						this.mainVue.$message({ type: 'success', message: "[[#{등록 성공}]]" });
+						this.initStore();
+					}.bind(this), true);
+					
+				}
+				
+		    }
+		});
+	/*]]>*/
+	</script>
+</body>
+</html>

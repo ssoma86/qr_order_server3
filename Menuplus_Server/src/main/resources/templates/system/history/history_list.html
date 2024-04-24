@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:include="main/import :: head"></head>
+<body>
+	<div id="app" class="contain">
+		<!-- 검색 조건 -->
+		<div class="search_form" ref="search_form">
+			<el-form :inline="true" :model="searchForm" label-width="120px" label-suffix=":" :size="size" @submit.native.prevent>
+				<el-row>
+					<el-col :span="6">
+						<el-form-item th:label="#{계정}">
+							<el-select v-model="searchForm.accountId" filterable remote default-first-option @keyup.enter.native="search" clearable="true"
+									th:placeholder="#{계정ID, 계정명을 입력 하여 검색}" :remote-method="accountSearch">
+								<el-option v-for="item in accounts" :key="item.accountId" :label="item.accountId + ' - ' +  item.accountNm" :value = "item.accountId"></el-option>
+							</el-select>
+						</el-form-item>
+					</el-col>
+					<el-col :span="6">
+						<el-form-item th:label="#{리소스}">
+							<el-select v-model="searchForm.resourcesCd" filterable remote default-first-option @keyup.enter.native="search" clearable="true"
+									th:placeholder="#{리소스 정보를 입력 하여 검색}" :remote-method="resourcesSearch">
+								<el-option v-for="item in resources" :key="item.resourcesCd" :label="item.resDesc" :value = "item.resourcesCd"></el-option>
+							</el-select>
+						</el-form-item>
+					</el-col>
+					<el-col :span="10">
+						<el-form-item th:label="#{기간}">
+							<el-date-picker v-model="sedtm" type="datetimerange" clearable="true" unlink-panels style="width: 360px;" :default-time="['06:00:00', '23:00:00']"
+									th:start-placeholder="#{날자 선택}" th:end-placeholder="#{날자 선택}" value-format="yyyy-MM-dd HH:mm:ss"></el-date-picker>
+						</el-form-item>
+					</el-col>
+				</el-row>
+			</el-form>
+		</div>
+		
+		<!-- 버튼-->
+		<div class="buttons" ref="buttons">
+			<el-button th:if='${sa_actions.contains("HistorySearch")}' :size="size" th:text="#{검색}" @click="search" icon="el-icon-search" ></el-button>
+		</div>
+		
+		<!-- 리스트 -->
+		<el-table :height="tableHeight - 48" border stripe highlight-current-row tooltip-effect="dark"
+				:data="tableData.slice((currPage - 1) * pageSize, currPage * pageSize)" :size="size" th:empty-text="#{데이타 없음}">
+			<el-table-column :label="tableData.length" type="index" 	width="55" align="center" sortable fixed label-class-name="data_cnt"></el-table-column>
+			<el-table-column type="selection" 		width="45" 			align="center" fixed></el-table-column>
+			<el-table-column th:label="#{새션Id}" 	prop="sessionId" 	min-width="150" align="center" sortable></el-table-column>
+			<el-table-column th:label="#{계정}" 		prop="account.accountNm" 	width="150" align="center"></el-table-column>
+			<el-table-column th:label="#{리소스}" 	prop="resources.resDesc" 	min-width="200" sortable></el-table-column>
+			<el-table-column th:label="#{작업시간}" 	prop="inDtm" 	min-width="150" align="center" sortable></el-table-column>
+			<el-table-column th:label="#{IP}" 		prop="inIp" 	min-width="150" align="center" sortable></el-table-column>
+		</el-table>
+		<el-pagination background layout="prev, pager, next, jumper, ->, sizes, total"
+			:page-sizes="[50, 100, 200, 300]" :page-size="pageSize" :current-page="currPage" :total="tableData.length"
+			@current-change="currPage = $event" @size-change="pageSize = $event"></el-pagination>
+	</div>
+	
+    <script type="text/javascript" charset="UTF-8">
+	/*<![CDATA[*/
+		new Vue({
+			el: '#app',
+			data: function () {
+				var data = parent.mainVue.initData();
+				data.url = "/history";
+				data.accounts = [];
+				data.resources = [];
+				data.searchForm = this.initSearchForm();
+				data.sedtm = [new Date(), new Date()];
+				
+				data.pageSize = 50;
+				data.currPage = 1;
+				
+				return data;
+			},
+			mounted: function () {
+				this.$nextTick(function () {
+					this.mainVue.currVue = this;
+				}.bind(this));
+			},
+			methods: {
+				// 검색 조건 초기화
+				initSearchForm: function () {
+					return {
+						accountId: null,
+						resourcesCd: null,
+						sdtm: '',
+						edtm: ''
+					}
+				},
+				// 계정 자동 검색
+				accountSearch: function (accountNm) {
+					this.mainVue.$axios.search('/account/searchByIdOrNm/' + accountNm, null, function (result) {
+						this.accounts = result;
+					}.bind(this));
+				},
+				// 리소스 자동 검색
+				resourcesSearch: function (resDesc) {
+					this.mainVue.$axios.search('/resources/' + resDesc, null, function (result) {
+						this.resources = result;
+					}.bind(this));
+				},
+				// 조회
+				search: function () {
+					if (null == this.sedtm || this.sedtm.length < 2) {
+						this.mainVue.$message({ type: 'success', message: "[[#{기간을 선택 하여 주십시오.}]]" });
+						return;
+					}
+					
+					this.searchForm.sdtm = this.sedtm[0];
+					this.searchForm.edtm = this.sedtm[1];
+					
+					this.mainVue.$axios.search(this.url, this.searchForm, function (result) {
+						this.currPage = 1;
+						this.tableData = result;
+					}.bind(this), this);
+				}
+		    }
+		});
+	/*]]>*/
+	</script>
+</body>
+</html>

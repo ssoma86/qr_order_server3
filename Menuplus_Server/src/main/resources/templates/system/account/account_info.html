@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:include="main/import :: head"></head>
+<body>
+	<div id="app" class="contain">
+		<!-- 검색 영역 -->
+		<div class="search_form" ref="search_form"></div>
+		
+		<!-- 버튼 -->
+		<div class="buttons" ref="buttons"></div>
+		
+		<!-- 입력 팝업 -->
+		<el-dialog :visible.sync="dialogFormVisible" fullscreen :show-close="false">
+			<el-form :model="inputForm" label-width="120px" label-suffix=":" :size="size" @submit.native.prevent>
+				<el-row>
+					<el-col :span="10">
+						<el-form-item th:label="#{계정ID}" :error="formError.accountId" required>
+							<span class="show_cd">{{ inputForm.accountId }}</span>
+						</el-form-item>
+					</el-col>
+					<el-col :span="10">
+						<el-form-item th:label="#{사용자명}" :error="formError.accountNm" required>
+							<el-input v-model="inputForm.accountNm" maxlength="50" clearable="true" show-word-limit></el-input>
+						</el-form-item>
+					</el-col>
+				</el-row>
+				<el-row>
+					<el-col :span="10">
+						<el-form-item th:label="#{비밀번호}" :error="formError.accountPw" required>
+							<el-input v-model="inputForm.accountPw" maxlength="20" type="password" clearable="true"></el-input>
+						</el-form-item>
+					</el-col>
+					<el-col :span="10">
+						<el-form-item th:label="#{비밀번호 확인}" :error="formError.accountPwConfirm" required>
+							<el-input v-model="inputForm.accountPwConfirm" maxlength="20" type="password" clearable="true"></el-input>
+						</el-form-item>
+					</el-col>
+				</el-row>
+				<el-row>
+					<el-col :span="10">
+						<el-form-item th:label="#{핸드폰 번호}" :error="formError.tel" required>
+							<el-input v-model="inputForm.tel" maxlength="20" clearable="true" show-word-limit @keyup.native="inputForm.tel = util.inputTelNew($event)"></el-input>
+						</el-form-item>
+					</el-col>
+					<el-col :span="10">
+						<el-form-item th:label="#{이메일}" :error="formError.email" required>
+							<el-input v-model="inputForm.email" maxlength="100" clearable="true" show-word-limit></el-input>
+						</el-form-item>
+					</el-col>
+				</el-row>
+			</el-form>
+			<div slot="footer" class="dialog-footer">
+				<el-button th:text="#{저장}" @click="save" icon="el-icon-check" :size="size" :disabled="btn.saveDisabled"></el-button>
+			</div>
+		</el-dialog>
+	</div>
+	
+    <script type="text/javascript" charset="UTF-8">
+	/*<![CDATA[*/
+		new Vue({
+			el: '#app',
+			data: function () {
+				var data = parent.mainVue.initData();
+				data.url = "/account";
+				
+				data.inputForm = this.initInputForm();
+				data.formError = this.initFormError();
+				
+				data.dialogFormVisible = true;
+				data.btn.saveDisabled = false;
+				
+				return data;
+			},
+			created: function () {
+				this.up();
+			},
+			mounted: function () {
+				this.$nextTick(function () {
+					this.mainVue.currVue = this;
+				}.bind(this));
+			},
+			watch: {
+				'inputForm.tel': function (newVal, oldVal) {
+					if (this.inputForm.telTmp != newVal && '' != newVal) {
+						this.chkTel();
+					}
+				},
+				'inputForm.email': function (newVal, oldVal) {
+					if (this.inputForm.emailTmp != newVal && '' != newVal) {
+						this.chkEmail();
+					}
+				}
+			},
+			methods: {
+				// 입력폼 초기화
+				initInputForm: function () {
+					return {
+						statu: "U",
+						accountId: '',
+						accountNm: '',
+						accountPw: '',
+						accountPwConfirm: '',
+						tel: '',
+						telTmp: '',
+						email: '',
+						emailTmp: ''
+					}
+				},
+				// 입력폼 오류 메세지 초기화
+				initFormError: function () {
+					return {
+						accountId: '',
+						accountNm: '',
+						accountPw: '',
+						accountPwConfirm: '',
+						tel: '',
+						email: ''
+					}
+				},
+				// 수정
+				up: function () {
+					this.mainVue.$axios.search(this.url + '/[[${sa_account.accountId}]]', null, function (result) {
+						result.accountPwConfirm = result.accountPw;
+						result.telTmp = result.tel;
+						result.emailTmp = result.email;
+						
+						this.inputForm = result;
+					}.bind(this), false);
+					
+					this.formError = this.initFormError();
+				},
+				// 저장
+				save: function () {
+					this.formError = this.initFormError();
+					
+					// 비밀번호와 확인 비밀번호 체크
+					if (this.inputForm.accountPw != this.inputForm.accountPwConfirm) {
+						this.formError.accountPwConfirm = "[[#{비밀번호가 일치 하지 않습니다.}]]";
+						
+						return;
+					}
+					
+					this.mainVue.$axios.up(this.url + "/" + this.inputForm.accountId, this.inputForm, this.formError, function (result) {
+						this.mainVue.$message({ type: 'success', message: "[[#{수정 성공}]]" });
+					}.bind(this));
+				},
+				// 전화번호 체크
+				chkTel: function () {
+					var tmp = util.inputTel(this.inputForm.tel);
+					
+					if (this.inputForm.tel != tmp) {
+						this.inputForm.tel = util.inputTel(this.inputForm.tel);
+					}
+					
+					if ('' != this.inputForm.tel) {
+						this.mainVue.$axios.patchNonLoading(this.url + '/chkTel/' + this.inputForm.tel, null, null, function (result) {
+							if ("" == result || result.accountId == this.inputForm.accountId) {
+								this.formError.tel = '';
+								this.btn.saveDisabled = false;
+							} else {
+								this.formError.tel = "[[#{이미 사용중인 {0}입니다.(#{전화번호})}]]";
+								this.btn.saveDisabled = true;
+							}
+						}.bind(this), false);
+					}
+				},
+				// 이메일 체크
+				chkEmail: function () {
+					this.mainVue.$axios.patchNonLoading(this.url + '/chkEmail/' + this.inputForm.email, null, null, function (result) {
+						if ("" == result || result.accountId == this.inputForm.accountId) {
+							this.formError.email = '';
+							this.btn.saveDisabled = false;
+						} else {
+							this.formError.email = "[[#{이미 사용중인 {0}입니다.(#{이메일})}]]";
+							this.btn.saveDisabled = true;
+						}
+					}.bind(this), false);
+				}
+		    }
+		});
+	/*]]>*/
+	</script>
+</body>
+</html>

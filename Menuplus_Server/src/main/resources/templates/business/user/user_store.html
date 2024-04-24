@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:include="main/import :: head"></head>
+<body>
+	<style type="text/css">
+		.el-dialog__header { padding: 0 !important; }
+	</style>
+	
+	<div id="app" class="contain">
+		<div class="search_form" ref="search_form" style="display:none;"></div>
+		<div class="buttons" ref="buttons" style="display:none;"></div>
+		
+		<!-- 입력 팝업 -->
+		<!-- <el-dialog :title="inputForm.title" :visible.sync="dialogFormVisible" fullscreen :show-close="false"> -->
+			<el-form :model="inputForm" label-width="120px" label-suffix=":" :size="size" @submit.native.prevent>
+				<el-row>
+					<el-col :span="10">
+						<el-form-item th:label="#{아이디}">
+							<span class="show_cd">{{ inputForm.accountId }}</span>
+						</el-form-item>
+					</el-col>
+					<el-col :span="10">
+						<el-form-item th:label="#{사용자명}" :error="formError.accountNm" required>
+							<el-input v-model="inputForm.accountNm" maxlength="50" clearable="true" show-word-limit></el-input>
+						</el-form-item>
+					</el-col>
+				</el-row>
+				<el-row>
+					<el-col :span="10">
+						<el-form-item th:label="#{비밀번호}" :error="formError.accountPw" required>
+							<el-input v-model="inputForm.accountPw" maxlength="20" type="password" clearable="true"></el-input>
+						</el-form-item>
+					</el-col>
+					<el-col :span="10">
+						<el-form-item th:label="#{비밀번호 확인}" :error="formError.accountPwConfirm" required>
+							<el-input v-model="inputForm.accountPwConfirm" maxlength="20" type="password" clearable="true"></el-input>
+						</el-form-item>
+					</el-col>
+				</el-row>
+				<el-row>
+					<el-col :span="10">
+						<el-form-item th:label="#{핸드폰 번호}" :error="formError.tel" required>
+							<el-input v-model="inputForm.tel" maxlength="20" clearable="true" show-word-limit @keyup.native="inputForm.tel = util.inputTelNew($event)"></el-input>
+						</el-form-item>
+					</el-col>
+					<el-col :span="10">
+						<el-form-item th:label="#{이메일}" :error="formError.email" required>
+							<el-input v-model="inputForm.email" maxlength="100" clearable="true" show-word-limit></el-input>
+						</el-form-item>
+					</el-col>
+				</el-row>
+			</el-form>
+			<div style="margin-top:20px;">
+				<el-button th:text="#{저장}" @click="save" icon="el-icon-check" :size="size" :disabled="btn.saveDisabled"></el-button>
+			</div>
+		<!-- </el-dialog> -->
+	</div>
+	
+    <script type="text/javascript">
+	/*<![CDATA[*/
+		new Vue({
+			el: '#app',
+			data: function () {
+				var data = parent.mainVue.initData();
+				data.url = "/user/info/store";
+				
+				data.inputForm = this.initInputForm();
+				data.formError = this.initFormError();
+				
+				data.dialogFormVisible = true;
+				data.btn.saveDisabled = false;
+				
+				return data;
+			},
+			created: function () {
+				this.up();
+			},
+			mounted: function () {
+				setTimeout(function () {
+					this.$nextTick(function () {
+						this.mainVue.currVue = this;
+					}.bind(this));
+				}.bind(this), 500);
+			},
+			methods: {
+				// 입력폼 초기화
+				initInputForm: function () {
+					return {
+						statu: "U",
+						title: '[[#{정보 수정}]]',
+						accountId: '',
+						accountNm: '',
+						accountPw: '',
+						accountPwConfirm: '',
+						tel: '',
+						email: ''
+					}
+				},
+				// 오류 메세지 초기화
+				initFormError: function () {
+					return {
+						accountNm: '',
+						accountPw: '',
+						accountPwConfirm: '',
+						tel: '',
+						email: ''
+					}
+				},
+				// 수정
+				up: function () {
+					this.mainVue.$axios.search(this.url, null, function (result) {
+						result.accountPwConfirm = result.accountPw;
+						this.inputForm = result;
+					}.bind(this), false);
+					
+					this.formError = this.initFormError();
+				},
+				// 저장
+				save: function () {
+					this.formError = this.initFormError();
+					
+					// 비밀번호와 확인 비밀번호 체크
+					if (this.inputForm.accountPw != this.inputForm.accountPwConfirm) {
+						this.formError.accountPwConfirm = "[[#{비밀번호가 일치 하지 않습니다.}]]";
+						
+						return;
+					}
+						
+					this.mainVue.$axios.up(this.url + "/" + this.inputForm.accountId, this.inputForm, this.formError, function (result) {
+						this.mainVue.$message({ type: 'success', message: "[[#{수정 성공}]]" });
+					}.bind(this), true);
+				}
+		    }
+		});
+	/*]]>*/
+	</script>
+</body>
+</html>

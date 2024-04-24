@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:include="main/import :: head"></head>
+<body>
+	<div id="app" class="contain">
+		<!-- 검색 영역 -->
+		<div class="search_form" ref="search_form">
+			<el-form :inline="true" :model="searchForm" label-width="120px" label-suffix=":" :size="size" @submit.native.prevent>
+				<el-row>
+					<el-col :span="6">
+						<el-form-item th:label="#{답변 여부}">
+							<combo :data="mainVue.code.answeredYn" th:label="#{전체}" :model="searchForm.answered" @change="searchForm.answered = $event"></combo>
+						</el-form-item>
+					</el-col>
+					<el-col :span="18">
+						<el-form-item th:label="#{기간}">
+							<el-date-picker v-model="sedtm" type="datetimerange" clearable="true" unlink-panels style="width: 360px;" :default-time="['06:00:00', '23:00:00']"
+									th:start-placeholder="#{날자 선택}" th:end-placeholder="#{날자 선택}" value-format="yyyy-MM-dd HH:mm:ss"></el-date-picker>
+						</el-form-item>
+					</el-col>
+				</el-row>
+			</el-form>
+		</div>
+		
+		<!-- 버튼 -->
+		<div class="buttons" ref="buttons">
+			<el-button th:if='${sa_actions.contains("InquirySearch")}' :size="size" th:text="#{검색}" @click="search" icon="el-icon-search" ></el-button>
+			<el-button th:if='${sa_actions.contains("InquiryUp")}' :size="size" th:text="#{답변}" @click="up" icon="el-icon-circle-plus-outline" :disabled="btn.addDisabled" ></el-button>
+			<el-button th:if='${sa_actions.contains("InquirySearch")}' :size="size" @click="handleExpand">{{ !expand ? "[[#{보기}]]" : "[[#{접기}]]" }}</el-button>
+			<el-button th:if='${sa_actions.contains("InquiryAdd") || sa_actions.contains("InquiryUp")}' :size="size" th:text="#{저장}" @click="save" icon="el-icon-check" :disabled="btn.saveDisabled" style="float: right;"></el-button>
+		</div>
+		
+		<!-- 리스트 -->
+		<el-row :gutter="20">
+			<el-col :span="14">
+				<el-table :height="tableHeight" border stripe highlight-current-row tooltip-effect="dark"
+						ref="refTable" :data="tableData" :size="size" th:empty-text="#{데이타 없음}" @row-click="handleRowClick">
+					<el-table-column :label="tableData.length" type="index" 	width="55" align="center" sortable label-class-name="data_cnt"></el-table-column>
+					<el-table-column type="expand">
+						<template slot-scope="scope">
+							<div style="margin: 10px 10px;" th:text="#{문의 내용}"></div>
+							<div style="margin: 10px 10px;">
+								<el-input type="textarea" v-model="scope.row.content" :autosize="{ minRows: 6, maxRows: 16 }"></el-input>
+							</div>
+							<div style="margin: 10px 10px;" th:text="#{답변 내용}" v-if="scope.row.answered"></div>
+							<div style="margin: 10px 10px;" v-if="scope.row.answered">
+								<el-input type="textarea" v-model="scope.row.answer" :autosize="{ minRows: 6, maxRows: 16 }"></el-input>
+							</div>
+						</template>
+					</el-table-column>
+					<el-table-column th:label="#{답변}"	prop="answered" min-width="80" align="center" sortable>
+						<template slot-scope="scope">
+							<div v-if="scope.row.answered">
+								<el-button type="text" @click="clickUp(scope.row)" th:text="#{답변 수정}" size="mini"></el-button>
+							</div>
+							<div v-else>
+								<el-button type="text" @click="clickUp(scope.row)" th:text="#{답변}"  size="mini"></el-button>
+							</div>
+						</template>
+					</el-table-column>
+					<el-table-column th:label="#{질문 일시}" 	prop="sendDtm" 		min-width="150" align="center" sortable></el-table-column>
+					<el-table-column th:label="#{제목}" 		prop="title" 		min-width="200" sortable show-overflow-tooltip></el-table-column>
+				</el-table>
+			</el-col>
+			<el-col :span="10">
+				<el-card shadow="never" :style="{ height: inputHeight + 'px' }">
+					<div slot="header">
+						<span th:text="#{답변}"></span>
+					</div>
+					<div>
+						<el-form :model="inputForm" label-width="120px" label-suffix=":" :size="size" :disabled="fromDisabled" @submit.native.prevent>
+							<el-form-item th:label="#{제목}">
+								<span>{{ inputForm.title }}</span>
+							</el-form-item>
+							
+							<el-form-item th:label="#{문의 내용}">
+								<span>{{ inputForm.content }}</span>
+							</el-form-item>
+							
+							<el-form-item th:label="#{답변 내용}" :error="formError.content" required>
+								<el-input type="textarea" v-model="inputForm.answer" :autosize="{ minRows: 6, maxRows: 16 }"></el-input>
+							</el-form-item>
+						</el-form>
+					</div>
+				</el-card>
+			</el-col>
+		</el-row>
+	</div>
+	
+    <script type="text/javascript">
+	/*<![CDATA[*/
+		new Vue({
+			el: '#app',
+			data: function () {
+				var data = parent.mainVue.initData();
+				data.url = "/inquiry";
+				
+				data.searchForm = this.initSearchForm();
+				
+				data.sedtm = [util.getDate('yyyy-MM-dd HH:mm:ss', util.dateAdd('d ', -1, new Date())),
+					util.getDate('yyyy-MM-dd HH:mm:ss', util.dateAdd('d ', 1, new Date()))];
+				
+				
+				data.inputForm = this.initInputForm();
+				data.formError = this.initFormError();
+				
+				data.expand = false;
+				
+				return data;
+			},
+			created: function () {
+				this.search();
+			},
+			mounted: function () {
+				setTimeout(function () {
+					this.$nextTick(function () {
+						this.mainVue.currVue = this;
+					}.bind(this));	
+				}.bind(this), 500);
+			},
+			methods: {
+				// 검색 조건 초기화
+				initSearchForm: function () {
+					return {
+						startDtm: null,
+						endDtm: null,
+						answered: ''
+					}
+				},
+				// 입력폼 초기화
+				initInputForm: function () {
+					return {
+						statu: 'I',
+						inquiryCd: 0,
+						title: '',
+						content: '',
+						answer: ''
+					}
+				},
+				// 오류 메세지 초기화
+				initFormError: function () {
+					return {
+						answer: ''
+					}
+				},
+				// 그리드 선택 이벤트
+				handleRowClick: function (val) {
+					if (null != val) {
+						this.btn.upDisabled = false;
+					}
+					this.selectData = val;
+				},
+				handleExpand: function () {
+					this.expand = !this.expand;
+					
+					for (var i = 0, len = this.$refs.refTable.tableData.length; i < len; i++) {
+						this.$refs.refTable.toggleRowExpansion(this.$refs.refTable.tableData[i], this.expand);
+					}
+				},
+				// 클릭해서 수정
+				clickUp: function (row) {
+					this.handleRowClick(row);
+					this.up();
+				},
+				// 수정
+				up: function () {
+					this.mainVue.$axios.get(this.url + '/' + this.selectData.inquiryCd, function (result) {
+						result.statu = "U";
+						
+						this.inputForm = result;
+						
+						this.formError = this.initFormError();
+						this.btn.saveDisabled = false;
+						this.fromDisabled = false;
+					}.bind(this));
+				},
+				// 조회
+				search: function () {
+					if (null == this.sedtm || this.sedtm.length < 2) {
+						this.mainVue.$message({ type: 'success', message: "[[#{기간을 선택 하여 주십시오.}]]" });
+						return;
+					}
+					
+					this.searchForm.startDtm = this.sedtm[0];
+					
+					if (this.searchForm.autoEdtm) {
+						this.sedtm = [this.sedtm[0], util.getDate('yyyy-MM-dd HH:mm:ss', new Date())]
+					}
+					
+					this.searchForm.endDtm = this.sedtm[1];
+					
+					this.mainVue.$axios.search(this.url, this.searchForm, function (result) {
+						this.tableData = result;
+						
+						this.btn.addDisabled = false;
+						this.btn.saveDisabled = true;
+						this.fromDisabled = true;
+						
+						this.inputForm = this.initInputForm();
+						this.formError = this.initFormError();
+					}.bind(this), false);
+				},
+				// 저장
+				save: function () {
+					this.formError = this.initFormError();
+					
+					this.mainVue.$axios.up(this.url + '/' + this.inputForm.inquiryCd, this.inputForm, this.formError, function (result) {
+						this.mainVue.$message({ type: 'success', message: "[[#{등록 성공}]]" });
+						this.search();
+					}.bind(this), true);
+				}
+		    }
+		});
+	/*]]>*/
+	</script>
+</body>
+</html>

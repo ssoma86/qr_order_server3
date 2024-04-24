@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    
+    <meta http-equiv="pragma" content="no-cache">
+    <meta http-equiv="Cache-Control" content="no-cache, must-revalidate">
+    <meta http-equiv="expires" content="Wed, 14 Nov 1981 00:00:00 GMT">
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0">
+    <meta name="description" content="MenuPlus" />
+    <meta name="author" content="lf" />
+
+    <title>MenuPlus</title>
+</head>
+<body>
+    <form id="transMgr" name="transMgr" method="post" action="https://mtx.tpay.co.kr/webTxInit">
+		<!-- 결제수단 -->
+		<input type="hidden" name="payMethod" th:value="${payMethod}"/>
+		
+		<!-- 결제타입 -->
+		<input type="hidden" name="transType" value="0"/>
+		<!-- 스킨타입 -->
+		<input type="hidden" name="skinType" value="skinB"/>
+		<!-- 결제방식 -->
+		<input type="hidden" name="paymentType" value="1"/>
+		<!-- 접속방식 -->
+		<input type="hidden" name="connType" value="0"/>
+		<!-- 상품명 -->
+		<input type="hidden" name="goodsName" th:value="${goodsName}"/>
+		<!-- 상품가격 -->
+		<input type="hidden" name="amt" th:value="${amt}"/>
+		<!-- 상품주문번호 -->
+		<input type="hidden" name="moid" th:value="${moid}"/>
+		<!-- 회원사고객ID -->
+		<input type="hidden" name="mallUserId" th:value="${mallUserId}"/>
+		<!-- 구매자명 -->
+		<input type="hidden" name="buyerName" th:value="${buyerName}"/>
+		<!-- 구매자연락처 -->
+		<input type="hidden" name="buyerTel" th:value="${buyerTel}"/>
+		<!-- 구매자이메일 -->
+		<input type="hidden" name="buyerEmail" th:value="${buyerEmail}"/>
+		<!-- 회원사아이디 -->
+		<input type="hidden" name="mid" th:value="${mid}"/>
+		<!-- tx 사용 -->
+		<input type="hidden" name="socketYn" value="N"/>
+		<!-- 소켓리턴URL -->
+		<input type="hidden" name="socketReturnURL" value=""/>
+		
+		<input type="hidden" name="vbankExpDate" th:value="${vbankExpDate}"/>
+		<input type="hidden" name="returnUrl" th:value="${returnUrl}"/>
+		<input type="hidden" name="cancelUrl" th:value="${cancelUrl}"/>
+		
+		<input type="hidden" name="prdtExpDate" value=""/>
+		<input type="hidden" name="resultYn" value="Y"/>
+		
+		<!-- 결제형태 -->
+		<input type="hidden" name="payType" value="1"/>
+		<!-- 결제일 -->
+		<input type="hidden" name="ediDate"	th:value="${ediDate}"/>
+		<!-- 암호화 검증 데이터 -->
+		<input type="hidden" name="encryptData" th:value="${encryptData}"/>
+		
+		<!-- User IP Address -->
+		<input type="hidden" name="userIp" th:value="${#httpServletRequest.getRemoteAddr()}"/>
+		<!-- SmartPhone Payment Gateway -->
+		<input type="hidden" name="browserType" value="SmartPhone"/>
+		<input type="hidden" name="mallReserved" value="MallReserved"/>
+		
+		<input type="hidden" name="mallIp" th:value="${mallIp}"/>
+		
+		<!-- App Prefix -->
+		<input type="hidden" name="appPrefix" value=""/>
+	</form>
+	
+	<div id="emsg">
+	
+	</div>
+	
+	<script type="text/javascript">
+		var resultCd = '[[${resultCd}]]';
+	
+		if ('S' == resultCd) {
+			var frm = document.transMgr;
+			frm.target = "_self";
+			frm.submit();	
+		} else {
+			document.getElementById('emsg').innerHTML = '[[${resultMsg}]]';
+		}
+	</script>
+</body>
+</html>

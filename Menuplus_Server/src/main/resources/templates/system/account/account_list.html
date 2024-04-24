@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:include="main/import :: head"></head>
+<body>
+	<div id="app" class="contain">
+		<!-- 검색 영역 -->
+		<div class="search_form" ref="search_form">
+			<el-form :inline="true" :model="searchForm" label-width="120px" label-suffix=":" :size="size" @submit.native.prevent>
+				<el-row>
+					<el-col :span="6">
+						<el-form-item th:label="#{계정ID}">
+							<el-input v-model="searchForm.accountId" @keyup.enter.native="search" clearable="true"></el-input>
+						</el-form-item>
+					</el-col>
+					<el-col :span="6">
+						<el-form-item th:label="#{사용 가능 여부}">
+							<combo :data="mainVue.code.useYn" th:label="#{전체}" :model="searchForm.useYn" @change="searchForm.useYn = $event"></combo>
+						</el-form-item>
+					</el-col>
+					<el-col :span="6">
+						<el-form-item th:label="#{사용자명}">
+							<el-input v-model="searchForm.accountNm" @keyup.enter.native="search" clearable="true"></el-input>
+						</el-form-item>
+					</el-col>
+				</el-row>
+				<!-- <el-row>
+					<el-col :span="6">
+						<el-form-item th:label="#{만료 여부}">
+							<combo :data="mainVue.code.nonExpired" th:label="#{전체}" :model="searchForm.nonExpired" @change="searchForm.nonExpired = $event"></combo>
+						</el-form-item>
+					</el-col>
+					
+					<el-col :span="6">
+						<el-form-item th:label="#{잠금 여부}">
+							<combo :data="mainVue.code.nonLocked" th:label="#{전체}" :model="searchForm.nonLocked" @change="searchForm.nonLocked = $event"></combo>
+						</el-form-item>
+					</el-col>
+					<el-col :span="6">
+						<el-form-item th:label="#{인증 만료 여부}">
+							<combo :data="mainVue.code.certificateNonExpired" th:label="#{전체}" :model="searchForm.certificateNonExpired" @change="searchForm.certificateNonExpired = $event"></combo>
+						</el-form-item>
+					</el-col>
+				</el-row> -->
+			</el-form>
+		</div>
+		
+		<!-- 버튼 -->
+		<div class="buttons" ref="buttons">
+			<el-button th:if='${sa_actions.contains("AccountSearch")}' :size="size" th:text="#{검색}" @click="search" icon="el-icon-search" ></el-button>
+			<el-button th:if='${sa_actions.contains("AccountAdd")}' :size="size" th:text="#{등록}" @click="add" icon="el-icon-circle-plus-outline" :disabled="btn.addDisabled" ></el-button>
+			<el-button th:if='${sa_actions.contains("AccountUp")}' :size="size" th:text="#{수정}" @click="up" icon="el-icon-edit-outline" :disabled="btn.upDisabled" ></el-button>
+			<el-button th:if='${sa_actions.contains("AccountDel")}' :size="size" th:text="#{삭제}" @click="del" icon="el-icon-remove-outline" :disabled="btn.delDisabled" ></el-button>
+			<el-button th:if='${sa_actions.contains("AccountAuth")}' :size="size" th:text="#{권한 설정}" @click="openAuth" icon="el-icon-setting" :disabled="btn.openAuthDisabled"></el-button>
+		</div>
+		
+		<!-- 리스트 -->
+		<el-table :height="tableHeight" border stripe highlight-current-row tooltip-effect="dark"
+				:data="tableData" :size="size" th:empty-text="#{데이타 없음}"
+				@row-click="handleRowClick" @select="handleRowChecked" @select-all="handleRowChecked">
+			<el-table-column :label="tableData.length" type="index" 	width="55" align="center" sortable fixed label-class-name="data_cnt"></el-table-column>
+			<el-table-column type="selection" 							width="45" align="center" fixed></el-table-column>
+			<el-table-column th:label="#{계정ID}" 	prop="accountId" 	min-width="100" sortable show-overflow-tooltip></el-table-column>
+			<el-table-column th:label="#{사용자명}" 	prop="accountNm" 	min-width="100" sortable show-overflow-tooltip></el-table-column>
+			<el-table-column th:label="#{핸드폰 번호}" 	prop="tel" 			min-width="130" align="center" sortable show-overflow-tooltip></el-table-column>
+			<el-table-column th:label="#{이메일}" 	prop="email" 		min-width="150" sortable show-overflow-tooltip></el-table-column>
+			<!-- <el-table-column th:label="#{최종 로그인 시간}" 	prop="lastLoginDtm" min-width="100" align="center" sortable show-overflow-tooltip></el-table-column> -->
+<!-- 			<el-table-column th:label="#{비번변경 시간}" prop="passChangeDtm" min-width="150" sortable show-overflow-tooltip></el-table-column> -->
+			<el-table-column th:label="#{사용 가능 여부}" prop="useYn" 		min-width="100" align="center" :formatter="mainVue.formatterCode"></el-table-column>
+			<!-- <el-table-column th:label="#{잠금 여부}" 	prop="nonLocked" 	min-width="100" align="center" :formatter="mainVue.formatterCode"></el-table-column> -->
+			<!-- <el-table-column th:label="#{만료 여부}" 	prop="nonExpired" 	min-width="100" align="center" :formatter="mainVue.formatterCode"></el-table-column> -->
+			<!-- <el-table-column th:label="#{인증 만료 여부}" prop="certificateNonExpired" min-width="120" align="center" :formatter="mainVue.formatterCode"></el-table-column> -->
+		</el-table>
+		
+		<!-- 입력 팝업 -->
+		<el-dialog :title="inputForm.title" :visible.sync="dialogFormVisible" fullscreen>
+			<el-form :model="inputForm" label-width="180px" label-suffix=":" :size="size" @submit.native.prevent>
+				<el-row>
+					<el-col :span="12">
+						<el-form-item th:label="#{계정ID}" :error="formError.accountId" required>
+							<el-input v-model="inputForm.accountId" maxlength="50" clearable="true" v-if="'I' === inputForm.statu" show-word-limit></el-input>
+							<span v-else class="show_cd">{{ inputForm.accountId }}</span>
+						</el-form-item>
+					</el-col>
+					<el-col :span="12">
+						<el-form-item th:label="#{사용자명}" :error="formError.accountNm" required>
+							<el-input v-model="inputForm.accountNm" maxlength="50" clearable="true" show-word-limit></el-input>
+						</el-form-item>
+					</el-col>
+					
+					<el-col :span="12">
+						<el-form-item th:label="#{비밀번호}" :error="formError.accountPw" required>
+							<el-input v-model="inputForm.accountPw" maxlength="60" type="password" clearable="true" show-word-limit></el-input>
+						</el-form-item>
+					</el-col>
+					<el-col :span="12">
+						<el-form-item th:label="#{비밀번호 확인}" :error="formError.accountPwConfirm" required>
+							<el-input v-model="inputForm.accountPwConfirm" maxlength="60" type="password" clearable="true" show-word-limit></el-input>
+						</el-form-item>
+					</el-col>
+					
+					<el-col :span="12">
+						<el-form-item th:label="#{핸드폰 번호}" :error="formError.tel" required>
+							<el-input v-model="inputForm.tel" maxlength="20" clearable="true" show-word-limit @keyup.native="inputForm.tel = util.inputTelNew($event)"></el-input>
+						</el-form-item>
+					</el-col>
+					<el-col :span="12">
+						<el-form-item th:label="#{이메일}" :error="formError.email" required>
+							<el-input v-model="inputForm.email" maxlength="100" clearable="true" show-word-limit></el-input>
+						</el-form-item>
+					</el-col>
+					
+					<el-col :span="12">
+						<el-form-item th:label="#{사용 가능 여부}" required>
+							<combo :data="mainVue.code.useYn" :model="inputForm.useYn" @change="inputForm.useYn = $event"></combo>
+						</el-form-item>
+					</el-col>
+					<!-- <el-col :span="12">
+						<el-form-item th:label="#{잠금 여부}" required>
+							<combo :data="mainVue.code.nonLocked" :model="inputForm.nonLocked" @change="inputForm.nonLocked = $event"></combo>
+						</el-form-item>
+					</el-col>
+					
+					<el-col :span="12">
+						<el-form-item th:label="#{만료 여부}" required>
+							<combo :data="mainVue.code.nonExpired" :model="inputForm.nonExpired" @change="inputForm.nonExpired = $event"></combo>
+						</el-form-item>
+					</el-col>
+					<el-col :span="12">
+						<el-form-item th:label="#{인증 만료 여부}" required>
+							<combo :data="mainVue.code.certificateNonExpired" :model="inputForm.certificateNonExpired" @change="inputForm.certificateNonExpired = $event"></combo>
+						</el-form-item>
+					</el-col> -->
+				</el-row>
+			</el-form>
+			<div slot="footer" class="dialog-footer">
+				<el-button th:text="#{저장}" icon="el-icon-check" :size="size" @click="save" :disabled="btn.saveDisabled"></el-button>
+				<el-button th:text="#{닫기}" icon="el-icon-close" :size="size" @click="dialogFormVisible = false"></el-button>
+			</div>
+		</el-dialog>
+		
+		<!-- 권한 설정 팝업 -->
+		<el-dialog th:title="#{권한 설정}" :visible.sync="authDialogFormVisible" fullscreen>
+			<el-table :height="popTableHeight" border stripe highlight-current-row tooltip-effect="dark"
+					ref="authTable" :data="authTableData" :size="size" th:empty-text="#{데이타 없음}"
+					@select="authHandleRowChecked" @select-all="authHandleRowChecked">
+				<el-table-column type="selection" 		width="45" 		align="center"></el-table-column>
+				<el-table-column th:label="#{권한ID}" 	prop="authId" 	min-width="150" sortable></el-table-column>
+				<el-table-column th:label="#{권한명}" 	prop="authNm" 	min-width="150" sortable></el-table-column>
+				<el-table-column th:label="#{사용 가능 여부}" prop="useYn" 	min-width="100" align="center" :formatter="mainVue.formatterCode"></el-table-column>
+			</el-table>
+			
+			<div slot="footer" class="dialog-footer">
+				<el-button th:text="#{저장}" icon="el-icon-check" :size="size" @click="save" :disabled="btn.saveDisabled"></el-button>
+				<el-button th:text="#{닫기}" icon="el-icon-close" :size="size" @click="authDialogFormVisible = false"></el-button>
+			</div>
+		</el-dialog>
+	</div>
+	
+    <script type="text/javascript" charset="UTF-8">
+	/*<![CDATA[*/
+		new Vue({
+			el: '#app',
+			data: function () {
+				var data = parent.mainVue.initData();
+				data.url = "/account";
+				
+				// 권한 설정 부분
+				data.btn.openAuthDisabled = true;
+				data.authDialogFormVisible = false;
+				
+				data.authTableData = [];
+				
+				data.searchForm = this.initSearchForm();
+				data.inputForm = this.initInputForm();
+				data.formError = this.initFormError();
+				
+				return data;
+			},
+			created: function () {
+				this.search();
+				this.initAuth();
+			},
+			mounted: function () {
+				setTimeout(function () {
+					this.$nextTick(function () {
+						this.mainVue.currVue = this;
+					}.bind(this));
+				}.bind(this), 500);
+			},
+			watch: {
+				'inputForm.accountId': function (newVal, oldVal) {
+					if ('' != newVal && 'I' === this.inputForm.statu) {
+						this.chkAccountId();
+					}
+				}
+			},
+			methods: {
+				// 검색 조건 초기화
+				initSearchForm: function () {
+					return {
+						accountId: '',
+						accountNm: '',
+						useYn: '',
+						nonLocked: '',
+						nonExpired: '',
+						certificateNonExpired: ''
+					}
+				},
+				// 입력폼 초기화
+				initInputForm: function () {
+					return {
+						statu: "I",
+						title: '',
+						accountId: '',
+						accountNm: '',
+						accountPw: '',
+						accountPwConfirm: '',
+						useYn: 'Y',
+						nonLocked: 'Y',
+						nonExpired: 'Y',
+						certificateNonExpired: 'Y',
+						tel: '',
+						telTmp: '',
+						email: '',
+						emailTmp: ''
+					}
+				},
+				// 입력폼 오류 메세지 초기화
+				initFormError: function () {
+					return {
+						accountId: '',
+						accountNm: '',
+						accountPw: '',
+						accountPwConfirm: '',
+						tel: '',
+						email: ''
+					}
+				},
+				// 그리드 선택 이벤트
+				handleRowClick: function (val) {
+					if (null != val) {
+						this.btn.upDisabled = false;
+						this.btn.openAuthDisabled = false;
+					}
+					
+					this.selectData = val;
+				},
+				// 체크 박스 체크 이벤트
+				handleRowChecked: function (selection, row) {
+					if (selection.length > 0) {
+						this.btn.delDisabled = false;	
+					} else {
+						this.btn.delDisabled = true;
+					}
+					
+					this.checkedData = [];
+					
+					for (var i = 0, len = selection.length; i < len; i++) {
+						this.checkedData[this.checkedData.length] = selection[i].accountId;
+					}
+				},
+				// 추가
+				add: function () {
+					this.inputForm = this.initInputForm();
+					this.formError = this.initFormError();
+					
+					this.dialogFormVisible = true;
+					this.btn.saveDisabled = false;
+					
+					this.inputForm.title = "[[#{계정 추가}]]";
+				},
+				// 수정
+				up: function () {
+					this.mainVue.$axios.get(this.url + '/' + this.selectData.accountId, function (result) {
+						result.accountPwConfirm = result.accountPw;
+						result.telTmp = result.tel;
+						result.emailTmp = result.email;
+						result.statu = "U";
+						result.title = "[[#{계정 수정}]]";
+						
+						this.inputForm = result;
+						
+						this.formError = this.initFormError();
+						
+						this.dialogFormVisible = true;
+						this.btn.saveDisabled = false;
+					}.bind(this));
+				},
+				// 조회
+				search: function () {
+					this.mainVue.$axios.search(this.url, this.searchForm, function (result) {
+						this.tableData = result;
+						
+						this.btn.addDisabled = false;
+						this.btn.upDisabled = true;
+						this.btn.delDisabled = true;
+						this.btn.openAuthDisabled = true;
+						
+						this.inputForm = this.initInputForm();
+						this.formError = this.initFormError();
+					}.bind(this), false);
+				},
+				// 삭제
+				del: function () {
+					this.mainVue.$confirm("[[#{{0}를 삭제 하시겠습니까?(#{계정 정보})}]]", this.mainVue.appMsg.systemAlterTitle, {
+				          confirmButtonText: "[[#{삭제}]]",
+				          cancelButtonText: "[[#{취소}]]",
+				          type: 'info'
+				        }).then(function () {
+				        	this.mainVue.$axios.del(this.url + "/" + this.checkedData.join(","), function (result) {
+				        		this.mainVue.$message({ type: 'success', message: "[[#{삭제 성공}]]" });
+				        		this.search();
+							}.bind(this));
+				        }.bind(this)).catch(function () {
+				        	this.mainVue.$message({ type: 'info', message: "[[#{삭제 취소}]]" });
+				        }.bind(this));
+				},
+				// 저장
+				save: function () {
+					this.formError = this.initFormError();
+					
+					if (this.dialogFormVisible) {
+						// 비밀번호와 확인 비밀번호 체크
+						if (this.inputForm.accountPw != this.inputForm.accountPwConfirm) {
+							this.formError.accountPwConfirm = "[[#{비밀번호가 일치 하지 않습니다.}]]";
+							
+							return;
+						}
+						
+						if ('I' === this.inputForm.statu) {
+							this.mainVue.$axios.add(this.url, this.inputForm, this.formError, function (result) {
+								this.mainVue.$message({ type: 'success', message: "[[#{등록 성공}]]" });
+								this.dialogFormVisible = false;
+								this.search();
+							}.bind(this));
+						} else {
+							this.mainVue.$axios.up(this.url + "/" + this.inputForm.accountId, this.inputForm, this.formError, function (result) {
+								this.mainVue.$message({ type: 'success', message: "[[#{수정 성공}]]" });
+								this.dialogFormVisible = false;
+								this.search();
+							}.bind(this));
+						}
+					} else if (this.authDialogFormVisible) {
+						this.mainVue.$axios.up(this.url + "/" + this.inputForm.accountId, this.inputForm, this.formError, function (result) {
+							this.mainVue.$message({ type: 'success', message: "[[#{수정 성공}]]" });
+							this.authDialogFormVisible = false;
+							this.search();
+						}.bind(this));
+					}
+				},
+				// 계정 아이디 체크
+				chkAccountId: function () {
+					this.mainVue.$axios.patchNonLoading(this.url + '/chk/' + this.inputForm.accountId, null, null, function (result) {
+						if ("" == result) {
+							this.formError.accountId = '';
+							this.btn.saveDisabled = false;
+						} else {
+							this.formError.accountId = "[[#{이미 사용중인 {0}입니다.(#{아이디})}]]";
+							this.btn.saveDisabled = true;
+						}
+					}.bind(this), false);
+				},
+				// 권한 데이타 초기화
+				initAuth: function () {
+					this.mainVue.$axios.search('/auth', { authId: "", authNm: "", useYn: "" }, function (result) {
+						this.authTableData = result;
+					}.bind(this), false);
+				},
+				// 권한 설정 팝업
+				openAuth: function () {
+					this.mainVue.$axios.get(this.url + '/' + this.selectData.accountId, function (result) {
+						this.inputForm = result;
+						this.authDialogFormVisible = true;
+						
+						this.btn.saveDisabled = false;
+						
+						// 설정된 권한
+						var authIds = [];
+						
+						for (var i = 0, len = this.inputForm.auths.length; i < len; i++) {
+							authIds.push(this.inputForm.auths[i].authId);
+						}
+						
+						var interval = setInterval(function () {
+							if (this.$refs.authTable) {
+								this.$refs.authTable.clearSelection();
+								
+								for (var i = 0, len = this.authTableData.length; i < len; i++) {
+									if (authIds.indexOf(this.authTableData[i].authId) > -1) {
+										this.$refs.authTable.toggleRowSelection(this.authTableData[i], true);
+									}
+								}
+								
+								clearInterval(interval);
+							}
+						}.bind(this), 10);
+					}.bind(this));
+				},
+				// 권한 리스트 체크 이벤트
+				authHandleRowChecked: function (selection) {
+					this.inputForm.auths = selection;
+				}
+		    }
+		});
+	/*]]>*/
+	</script>
+</body>
+</html>

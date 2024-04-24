@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:include="main/import :: head"></head>
+<body>
+	<div id="app" class="contain">
+		<!-- 검색 조건 -->
+		<div class="search_form" ref="search_form">
+			<el-form :inline="true" :model="searchForm" label-width="140px" label-suffix=":" :size="size" @submit.native.prevent>
+				<el-row>
+					<el-col :span="6">
+						<el-form-item th:label="#{언어 코드 OR 명}">
+							<el-input v-model="searchForm.nm" @keyup.enter.native="search" clearable="true"></el-input>
+						</el-form-item>
+                    </el-col>
+                    <el-col :span="6">
+						<el-form-item th:label="#{사용 가능 여부}">
+							<combo :data="mainVue.code.useYn" th:label="#{전체}" :model="searchForm.useYn" @change="searchForm.useYn = $event"></combo>
+						</el-form-item>
+					</el-col>
+				</el-row>
+			</el-form>
+        </div>
+        
+        <!-- 버튼-->
+        <div class="buttons" ref="buttons">
+            <el-button th:if='${sa_actions.contains("LanSearch")}' :size="size" th:text="#{검색}" @click="search" icon="el-icon-search"></el-button>
+            <el-button th:if='${sa_actions.contains("LanAdd")}' :size="size" th:text="#{등록}" @click="add" icon="el-icon-circle-plus-outline" :disabled="btn.addDisabled"></el-button>
+            <el-button th:if='${sa_actions.contains("LanUp")}' :size="size" th:text="#{수정}" @click="up" icon="el-icon-edit-outline" :disabled="btn.upDisabled"></el-button>
+            <el-button th:if='${sa_actions.contains("LanAdd") || sa_actions.contains("LanUp")}' :size="size" th:text="#{저장}" @click="save" icon="el-icon-check" :disabled="btn.saveDisabled" style="float: right;"></el-button>
+        </div>
+        
+        <!-- 리스트 -->
+        <el-row :gutter="20">
+            <el-col :span="16">
+                <div id="out-table">
+                    <el-table :height="tableHeight" border stripe highlight-current-row tooltip-effect="dark"
+                            :data="tableData" :size="size" th:empty-text="#{데이타 없음}"
+                            @row-click="handleRowClick" @select="handleRowChecked" @select-all="handleRowChecked">
+                        <el-table-column :label="tableData.length" type="index" width="55" align="center" label-class-name="data_cnt"></el-table-column>
+                        <el-table-column type="selection" width="45" align="center"></el-table-column>
+                        <el-table-column th:label="#{언어 코드}"	prop="id" min-width="50" align="center"></el-table-column>
+                        <el-table-column th:label="#{언어 명}"		prop="nm" min-width="100" align="center"></el-table-column>
+                        <el-table-column th:label="#{시스템 디폴트}" prop="default_" min-width="80" align="center" :formatter="mainVue.formatterCode"></el-table-column>
+                        <el-table-column th:label="#{순번}"		prop="ord" min-width="50" align="center"></el-table-column>
+                        <el-table-column th:label="#{참조값1}"	prop="ref1" min-width="100"></el-table-column>
+                        <el-table-column th:label="#{참조값2}"	prop="ref2" min-width="100"></el-table-column>
+                        <el-table-column th:label="#{사용 가능 여부}" prop="useYn" min-width="110" align="center" :formatter="mainVue.formatterCode"></el-table-column>
+                    </el-table>
+                </div>
+            </el-col>
+            <el-col :span="8">
+                <el-card shadow="never" :style="{ height: inputHeight + 'px' }">
+                    <div slot="header">
+                        <span th:text="#{언어}"></span>
+                        <span v-if="'I' == inputForm.statu" th:text="#{추가}"></span>
+                        <span v-if="'U' == inputForm.statu" th:text="#{수정}"></span>
+                    </div>
+                    <div>
+                        <el-form :model="inputForm" label-width="120px" label-suffix=":"
+                                :size="size" :disabled="fromDisabled" @submit.native.prevent>
+                            <el-form-item th:label="#{언어 코드}" :error="formError.id" required>
+                                <el-input v-model="inputForm.id" maxlength="50" show-word-limit
+									clearable="true" v-if="'I' === inputForm.statu"></el-input>
+								<span v-else class="show_cd">{{ inputForm.id }}</span>
+                            </el-form-item>
+                            <el-form-item th:label="#{언어명}" :error="formError.nm" required>
+                                <el-input v-model="inputForm.nm" maxlength="250" clearable="true" show-word-limit></el-input>
+                            </el-form-item>
+                            <el-form-item th:label="#{시스템 디폴트}" :error="formError.default_">
+								<el-checkbox v-model="inputForm.default_" th:label="#{디폴트}" border></el-checkbox>
+							</el-form-item>
+							<el-form-item th:label="#{순서}" :error="formError.ord" required>
+								<el-input-number v-model="inputForm.ord" :min="1" :max = "99"></el-input-number>
+							</el-form-item>
+                            <el-form-item th:label="#{참조값1}">
+                                <el-input v-model="inputForm.ref1" maxlength="50" clearable="true" show-word-limit></el-input>
+                            </el-form-item>
+                            <el-form-item th:label="#{참조값2}">
+                                <el-input v-model="inputForm.ref2" maxlength="50" clearable="true" show-word-limit></el-input>
+                            </el-form-item>
+                            <el-form-item th:label="#{사용 가능 여부}" required>
+								<combo :data="mainVue.code.useYn" :model="inputForm.useYn" @change="inputForm.useYn = $event"></combo>
+							</el-form-item>
+                        </el-form>
+                    </div>
+                </el-card>
+            </el-col>
+        </el-row>
+	</div>
+    <script type="text/javascript" charset="UTF-8">
+	/*<![CDATA[*/
+		new Vue({
+			el: '#app',
+			data: function () {
+				var data = parent.mainVue.initData();
+				data.url = "/lan";
+				
+                data.searchForm = this.initSearchForm();
+				data.inputForm = this.initInputForm();
+				data.formError = this.initFormError();
+				
+				return data;
+			},
+			created: function () {
+                this.search();
+			},
+			mounted: function () {
+				setTimeout(function () {
+					this.$nextTick(function () {
+						this.mainVue.currVue = this;
+					}.bind(this));	
+				}.bind(this), 500);
+			},
+			watch: {
+				'inputForm.id': function (newVal, oldVal) {
+					if ('' != newVal && 'I' === this.inputForm.statu) {
+						this.chkLanId();
+					}
+				}
+			},
+			methods: {
+				// 검색 조건 초기화
+				initSearchForm: function () {
+					return {
+                        nm: '',
+                        useYn: ''
+					}
+				},
+				// 입력폼 초기화
+				initInputForm: function () {
+					return {
+						statu: 'I',
+						id: '',
+                        nm: '',
+                        ord: 1,
+						ref1: '',
+						ref2: '',
+						default_: false,
+						useYn: 'Y'
+					}
+				},
+				// 오류 메세지 초기화
+				initFormError: function () {
+					return {
+						id: '',
+                        nm: '',
+                        ord: ''
+					}
+				},
+                // 그리드 선택 이벤트
+				handleRowClick: function (val) {
+					if (null != val) {
+						this.btn.upDisabled = false;
+					}
+					this.selectData = val;
+				},
+				// 체크 박스 체크 이벤트
+				handleRowChecked: function (selection, row) {
+					if (selection.length > 0) {
+						this.btn.delDisabled = false;	
+					} else {
+						this.btn.delDisabled = true;
+					}
+					
+					this.checkedData = [];
+					
+					for (var i = 0, len = selection.length; i < len; i++) {
+						this.checkedData[this.checkedData.length] = selection[i].id;
+					}
+				},
+				// 추가
+				add: function () {
+					this.inputForm = this.initInputForm();
+					this.formError = this.initFormError();
+					
+					this.btn.saveDisabled = false;
+					this.fromDisabled = false;
+				},
+				// 수정
+				up: function () {
+					this.mainVue.$axios.get(this.url + '/' + this.selectData.id, function (result) {
+						result.statu = "U";
+						
+						this.inputForm = result;
+						
+						this.formError = this.initFormError();
+						
+						this.btn.saveDisabled = false;
+						this.fromDisabled = false;
+					}.bind(this), true);
+				},
+				// 조회
+				search: function () {
+					this.mainVue.$axios.search(this.url, this.searchForm, function (result) {
+						this.tableData = result;
+						
+						this.btn.addDisabled = false;
+						this.btn.upDisabled = true;
+						this.btn.saveDisabled = true;
+						this.fromDisabled = true;
+						
+						this.inputForm = this.initInputForm();
+						this.formError = this.initFormError();
+					}.bind(this), true);
+				},
+				// 저장
+				save: function () {
+					this.formError = this.initFormError();
+					
+					if ('I' === this.inputForm.statu) {
+						this.mainVue.$axios.add(this.url, this.inputForm, this.formError, function (result) {
+							this.mainVue.$message({ type: 'success', message: "[[#{등록 성공}]]" });
+							this.search();
+						}.bind(this), true);
+					} else {
+						this.mainVue.$axios.up(this.url + "/" + this.inputForm.id, this.inputForm, this.formError, function (result) {
+							this.mainVue.$message({ type: 'success', message: "[[#{수정 성공}]]" });
+							this.search();
+						}.bind(this), true);
+					}
+				},
+				chkLanId: function () {
+					this.mainVue.$axios.patchNonLoading(this.url + '/chk/' + this.inputForm.id, null, null, function (result) {
+						if ("" == result) {
+							this.formError.id = '';
+							this.btn.saveDisabled = false;
+						} else {
+							this.formError.id = "[[#{이미 사용중인 {0}입니다.(#{언어 코드})}]]";
+							this.btn.saveDisabled = true;
+						}
+					}.bind(this), false);
+				}
+		    }
+		});
+	/*]]>*/
+	</script>
+</body>
+</html>

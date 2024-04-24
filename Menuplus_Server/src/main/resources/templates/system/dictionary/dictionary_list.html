@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:include="main/import :: head"></head>
+<body>
+	<div id="app" class="contain">
+		<!-- 검색 조건 -->
+		<div class="search_form" ref="search_form">
+			<el-form :inline="true" :model="searchForm" label-width="120px" label-suffix=":" :size="size" @submit.native.prevent>
+				<el-row>
+					<el-col :span="10">
+						<el-form-item th:label="#{언어}">
+							<el-input v-model="searchForm.nm" @keyup.enter.native="search" style="width: 200%;" clearable="true"></el-input>
+						</el-form-item>
+					</el-col>
+					<el-col :span="6">
+						<el-form-item th:label="#{타입}">
+							<code-combo :data="dictionaryTp" th:label="#{전체}" :model="searchForm.dictionaryTpCd" @change="searchForm.dictionaryTpCd = $event.cd"></code-combo>
+						</el-form-item>
+					</el-col>
+				</el-row>
+			</el-form>
+        </div>
+        
+        <!-- 버튼-->
+        <div class="buttons" ref="buttons">
+            <el-button th:if='${sa_actions.contains("DictionarySearch")}' :size="size" th:text="#{검색}" @click="search" icon="el-icon-search"></el-button>
+            <el-button th:if='${sa_actions.contains("DictionaryAdd")}' :size="size" th:text="#{등록}" @click="add" icon="el-icon-circle-plus-outline" :disabled="btn.addDisabled"></el-button>
+            <el-button th:if='${sa_actions.contains("DictionaryUp")}' :size="size" th:text="#{수정}" @click="up" icon="el-icon-edit-outline" :disabled="btn.upDisabled"></el-button>
+            <el-button th:if='${sa_actions.contains("DictionaryDown")}' :size="size" th:text="#{출력}" @click="downExcel" icon="el-icon-download"></el-button>
+            
+            <el-upload th:if='${sa_actions.contains("DictionaryDown")}' :show-file-list="false" action="/dictionary/up" accept="application/vnd.ms-excel"
+            		 style="display: inline; margin-left: 10px;" :on-success="upSuccess" :on-error="upError">
+  				<el-button :size="size" th:text="#{업로드}" icon="el-icon-upload"></el-button>
+			</el-upload>
+
+            <el-button th:if='${sa_actions.contains("DictionaryAdd") || sa_actions.contains("DictionaryUp")}' :size="size" th:text="#{저장}" @click="save" icon="el-icon-check" :disabled="btn.saveDisabled" style="float: right;"></el-button>
+        </div>
+        
+        <!-- 리스트 -->
+        <el-row :gutter="20">
+            <el-col :span="16">
+	            <el-table :height="tableHeight" border stripe highlight-current-row tooltip-effect="dark"
+	                    :data="tableData" :size="size" th:empty-text="#{데이타 없음}" @row-click="handleRowClick">
+	                <el-table-column :label="tableData.length" type="index" width="55" align="center" label-class-name="data_cnt"></el-table-column>
+	                <el-table-column th:label="#{언어 코드}" prop="id" min-width="200" sortable show-overflow-tooltip></el-table-column>
+	                <el-table-column th:label="#{타입}" prop="dictionaryTp.nmLan" min-width="120" align="center" sortable show-overflow-tooltip></el-table-column>
+	                <el-table-column v-for="item in lans" :label="item.nm" :prop="item.id" min-width="200" sortable show-overflow-tooltip></el-table-column>
+	            </el-table>
+            </el-col>
+            <el-col :span="8">
+                <el-card shadow="never" :style="{ height: inputHeight + 'px' }">
+                    <div slot="header">
+                        <span th:text="#{언어}"></span>
+                        <span v-if="'I' == inputForm.statu" th:text="#{추가}"></span>
+                        <span v-if="'U' == inputForm.statu" th:text="#{수정}"></span>
+                    </div>
+                    <div>
+                        <el-form :model="inputForm" label-width="120px" label-suffix=":"
+                                :size="size" :disabled="fromDisabled" @submit.native.prevent>
+                            <el-form-item th:label="#{언어 코드}" :error="formError.id" required>
+                                <template v-if="'I' === inputForm.statu">
+	                                <el-input v-model="inputForm.id" maxlength="250" show-word-limit clearable="true">
+	                                	<el-button slot="append" :size="size" th:text="#{키워드 조회}" @click="showDataSearchPop" icon="el-icon-search"></el-button>
+	                                </el-input>
+								</template>
+								
+								<span v-else class="show_cd">{{ inputForm.id }}</span>
+                            </el-form-item>
+                            
+                            <el-form-item th:label="#{타입}" :error="formError['dictionaryTp.cd']" required>
+								<code-combo :data="dictionaryTp" :model="inputForm.dictionaryTp" @change="inputForm.dictionaryTp = $event"></code-combo>
+							</el-form-item>
+							
+                            <el-form-item th:label="#{한국어}" :error="formError.nm" required>
+                                <el-input v-model="inputForm.nm" type="textarea" maxlength="250" show-word-limit></el-input>
+                            </el-form-item>
+                            <el-form-item v-for="item in inputForm.dictionarys" :label="item.lan.nm">
+                                <el-input v-model="item.nm" type="textarea" maxlength="250" show-word-limit></el-input>
+                            </el-form-item>
+                        </el-form>
+                    </div>
+                </el-card>
+            </el-col>
+        </el-row>
+        
+        <!-- 키워드 조회 팝업 -->
+		<el-dialog th:title="#{키워드 조회}" :visible.sync="dialogFormVisible" width="900px">
+			<!-- 검색 조건 -->
+			<div class="search_form" ref="search_form" style="margin-bottom: 10px;">
+				<el-form :inline="true" label-width="60px" label-suffix=":" :size="size" @submit.native.prevent>
+					<el-row>
+						<el-col :span="8">
+							<el-form-item th:label="#{타입}">
+								<code-combo :data="dictionaryTp" th:label="#{전체}" :model="searchDictionaryTpCd" @change="searchDictionaryTpCd = $event.cd"></code-combo>
+							</el-form-item>
+						</el-col>
+						<el-col :span="10">
+							<el-form-item th:label="#{언어}">
+								<el-input v-model="searchText" @keyup.enter.native="search" clearable="true" style="width: 180%;">
+									<el-button slot="append" :size="size" th:text="#{검색}" @click="dataSearch" icon="el-icon-search"></el-button>
+								</el-input>
+							</el-form-item>
+						</el-col>
+					</el-row>
+				</el-form>
+	        </div>
+        
+			<el-table :height="tableHeight" border stripe highlight-current-row tooltip-effect="dark"
+                    :data="popTableData" :size="size" th:empty-text="#{데이타 없음}">
+                <el-table-column :label="popTableData.length" type="index" width="55" align="center" label-class-name="data_cnt" fixed></el-table-column>
+                
+                <el-table-column fixed>
+                	<template slot-scope="scope">
+                		<el-button :size="size" th:text="#{선택}" @click="handleSelect(scope.row)"></el-button>
+                	</template>
+                </el-table-column>
+    
+                <el-table-column th:label="#{언어 코드}" prop="id" min-width="200" sortable show-overflow-tooltip></el-table-column>
+                <el-table-column v-for="item in lans" :label="item.nm" :prop="item.id" min-width="200" sortable show-overflow-tooltip></el-table-column>
+            </el-table>
+		</el-dialog>
+	</div>
+    <script type="text/javascript" charset="UTF-8">
+	/*<![CDATA[*/
+		new Vue({
+			el: '#app',
+			data: function () {
+				var data = parent.mainVue.initData();
+                
+				data.url = "/dictionary";
+				
+				data.lans = [];
+				data.dictionaryTp = [];
+				
+				data.searchForm = this.initSearchForm();
+				data.inputForm = this.initInputForm();
+				data.formError = this.initFormError();
+				
+			
+				
+				data.popTableData = [];
+				data.dialogFormVisible = false;
+				data.searchDictionaryTpCd = 0;
+				data.searchText = "";
+				
+				return data;
+			},
+			created: function () {
+				this.initLan();
+				this.initDictionaryTp();
+				this.search();
+			},
+			mounted: function () {
+				setTimeout(function () {
+					this.$nextTick(function () {
+						this.mainVue.currVue = this;
+					}.bind(this));	
+				}.bind(this), 1000);
+			},
+			watch: {
+				'inputForm.id': function (newVal, oldVal) {
+					if ('' != newVal && 'I' === this.inputForm.statu) {
+						this.chkDictionaryId();
+					}
+				}
+			},
+			methods: {
+				// 검색 조건 초기화
+				initSearchForm: function () {
+					return {
+						nm: '',
+						dictionaryTpCd: 0
+					}
+				},
+				// 입력폼 초기화
+				initInputForm: function () {
+					var obj = {
+						statu: "I",
+						cd: 0,
+						id: '',
+						nm: '',
+						useYn: 'Y',
+						lan: null,
+						dictionaryTp: { cd: null, nm: '' },
+						dictionarys: []
+					}
+					
+					if (null != this.lans) {
+						// 기타 언어 변수 설정
+						for (var i = 0, len = this.lans.length; i < len; i++) {
+							if ('ko' == this.lans[i].id) {
+								obj.lan = this.lans[i];
+							} else {
+								obj.dictionarys.push({
+										cd: 0,
+                                        id: '',
+                                        nm: '',
+										useYn: 'Y',
+										lan: this.lans[i],
+										dictionaryTp: { cd: null, nm: '' }
+								});
+							}
+						}
+					}
+					
+					return obj;
+				},
+				// 오류 메세지 초기화
+				initFormError: function () {
+					return {
+						id: '',
+						nm: '',
+						'dictionaryTp.cd': ''
+					}
+				},
+                // 그리드 선택 이벤트
+				handleRowClick: function (val) {
+					if (null != val) {
+						this.btn.upDisabled = false;
+					}
+					this.selectData = val;
+				},
+				// 언어 데이타 조회
+				initLan: function () {
+					this.mainVue.$axios.search("/language", null, function (result) {
+						this.lans = result;
+					}.bind(this), false);
+				},
+				// 단말 타입 데이타 조회
+				initDictionaryTp: function () {
+					this.mainVue.$axios.search("/code/getCode/DICTIONARY_TP", null, function (result) {
+						this.dictionaryTp = result;
+					}.bind(this), false);
+				},
+				// 추가
+				add: function () {
+					this.inputForm = this.initInputForm();
+					// 단말 타입 처음 항목 설정
+					this.inputForm.dictionaryTp = this.dictionaryTp.length > 0 ? util.copyObj(this.dictionaryTp[0]) : { cd: null, nm: '' };
+					for (var i = 0, len = this.inputForm.dictionarys.length; i < len; i++) {
+						this.inputForm.dictionarys[i].dictionaryTp = this.dictionaryTp.length > 0 ? util.copyObj(this.dictionaryTp[0]) : { cd: null, nm: '' };
+					}
+					
+					this.formError = this.initFormError();
+					
+					this.btn.saveDisabled = false;
+					this.fromDisabled = false;
+				},
+				// 수정
+				up: function () {
+					this.mainVue.$axios.get(this.url + '/' + this.selectData.cd, function (result) {
+						result.statu = "U";
+						
+						this.inputForm = result;
+						
+						// 수정 시 등록되지 안은 기타 언어 변수 설정
+						for (var i = 0, len = this.lans.length; i < len; i++) {
+							if ('ko' != this.lans[i].id) {
+								var isContains = false;
+								
+								for (var j = 0, jlen = this.inputForm.dictionarys.length; j < jlen; j++) {
+									if (this.inputForm.dictionarys[j].lan.id === this.lans[i].id) {
+										isContains = true;
+									}
+								}
+								
+								if (!isContains) {
+									this.inputForm.dictionarys.push({
+											cd: 0,
+											id: this.inputForm.id,
+											nm: this.inputForm.id,
+											useYn: 'Y',
+											lan: this.lans[i],
+											dictionaryTp: this.inputForm.dictionaryTp
+									});
+								}
+							}
+						}
+						
+						this.formError = this.initFormError();
+						
+						this.btn.saveDisabled = false;
+						this.fromDisabled = false;
+					}.bind(this), true);
+				},
+				// 조회
+				search: function () {
+					this.mainVue.$axios.search(this.url, this.searchForm, function (result) {
+						this.tableData = [];
+						
+						for (var i = 0, len = result.length; i < len; i++) {
+							var tmp = result[i];
+							
+							tmp[result[i].lan.id] = result[i].nm;
+							
+							for (var j = 0, jlen = result[i].dictionarys.length; j < jlen; j++) {
+								tmp[result[i].dictionarys[j].lan.id] = result[i].dictionarys[j].nm;
+							}
+							
+							this.tableData.push(tmp);
+						}
+						
+						this.btn.addDisabled = false;
+						this.btn.upDisabled = true;
+						this.btn.saveDisabled = true;
+						this.fromDisabled = true;
+						
+						this.inputForm = this.initInputForm();
+						this.formError = this.initFormError();
+					}.bind(this), true);
+				},
+				// 저장
+				save: function () {
+					this.formError = this.initFormError();
+					
+					var tmpInput = {
+							cd: this.inputForm.cd,
+							id: this.inputForm.id,
+							nm: this.inputForm.nm,
+							useYn: this.inputForm.useYn,
+							lan: this.inputForm.lan,
+							dictionaryTp: this.inputForm.dictionaryTp,
+							dictionarys: []
+					};
+					
+					// 입력되지 안은 언어 삭제
+					for (var i = 0, len = this.inputForm.dictionarys.length; i < len; i++) {
+						if ('' != this.inputForm.dictionarys[i].nm) {
+							// 언어 코드 기타 언어에도 똑같이 설정
+							this.inputForm.dictionarys[i].id = this.inputForm.id;
+							this.inputForm.dictionarys[i].dictionaryTp = this.inputForm.dictionaryTp;
+							tmpInput.dictionarys[tmpInput.dictionarys.length] = this.inputForm.dictionarys[i];
+						}
+					}
+					
+					if ('I' === this.inputForm.statu) {
+						this.mainVue.$axios.add(this.url, tmpInput, this.formError, function (result) {
+							this.mainVue.$message({ type: 'success', message: "[[#{등록 성공}]]" });
+							this.search();
+						}.bind(this), true);
+					} else {
+						this.mainVue.$axios.up(this.url + "/" + this.inputForm.cd, tmpInput, this.formError, function (result) {
+							this.mainVue.$message({ type: 'success', message: "[[#{수정 성공}]]" });
+							this.search();
+						}.bind(this), true);
+					}
+				},
+				chkDictionaryId: function () {
+					// 서버에서 한국어 기준으로 체크 함
+					this.mainVue.$axios.patchNonLoading(this.url + '/chk/' + encodeURI(this.inputForm.id), null, null, function (result) {
+						if ("" == result) {
+							this.formError.id = '';
+							this.btn.saveDisabled = false;
+						} else {
+							this.formError.id = "[[#{이미 사용중인 {0} 입니다.(#{언어 코드})}]]";
+							this.btn.saveDisabled = true;
+						}
+					}.bind(this), false);
+				},
+				downExcel: function () {
+					location.href = this.url + '/down?nm=' + this.searchForm.nm;
+				},
+				upSuccess: function () {
+					this.mainVue.$message({ type: 'success', message: "[[#{업로드 되었습니다}]]" });
+					this.search();
+				},
+				upError: function () {
+					this.mainVue.$message({ type: 'error', message: "[[#{업로드 실패 하였습니다}]]" });
+				},
+				// 등록된 키워드 조회 팝업 
+				showDataSearchPop: function () {
+					this.dialogFormVisible = true;
+					this.dataSearch();
+				},
+				// 키워드 데이타 조회
+				dataSearch: function () {
+					this.mainVue.$axios.search(this.url + "/searchText", { searchText: this.searchText, dictionaryTpCd: this.searchDictionaryTpCd }, function (result) {
+						this.popTableData = [];
+						
+						for (var i = 0, len = result.length; i < len; i++) {
+							var tmp = result[i];
+							
+							tmp[result[i].lan.id] = result[i].nm;
+							
+							for (var j = 0, jlen = result[i].dictionarys.length; j < jlen; j++) {
+								tmp[result[i].dictionarys[j].lan.id] = result[i].dictionarys[j].nm;
+							}
+							
+							this.popTableData.push(tmp);
+						}
+					}.bind(this), true);
+				},
+				// 키워드 데이타 선택
+				handleSelect: function (row) {
+					this.inputForm.id = row.id;
+					this.inputForm.nm = row.nm;
+					this.inputForm.dictionaryTp = row.dictionaryTp;
+					
+					// 등록 안된 언어가 있으면 기본 언어로 값을 설정 해줌
+					for (var i = 0, len = this.lans.length; i < len; i++) {
+						if (this.lans[i].id != row.lan.id) {
+							var isExist = false;
+							
+							for (var j = 0, jlen = row.dictionarys.length; j < jlen; j++) {
+								if (this.lans[i].id == row.dictionarys[j].lan.id) {
+									isExist = true;
+									break;
+								}
+							}
+							
+							if (!isExist) {
+								row.dictionarys.splice(i, 0, {
+									id: row.id,
+									nm: row.nm,
+									dictionaryTp: row.dictionaryTp,
+									lan: this.lans[i],
+									useYn: 'Y'
+								});
+							}
+						}
+					}
+					
+					this.inputForm.dictionarys = row.dictionarys;
+					this.dialogFormVisible = false;
+				}
+				
+		    }
+		});
+	/*]]>*/
+	</script>
+</body>
+</html>

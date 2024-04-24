@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:include="main/import :: head"></head>
+<body>
+	<div id="app" class="contain">
+		<!-- 검색 영역 -->
+		<div class="search_form" ref="search_form">
+			<el-form :inline="true" :model="searchForm" label-width="120px" label-suffix=":" :size="size" @submit.native.prevent>
+				<el-row>
+					<el-col :span="6">
+						<el-form-item th:label="#{상품그룹명}">
+							<el-input v-model="searchForm.categoryNm" @keyup.enter.native="search" clearable="true"></el-input>
+						</el-form-item>
+					</el-col>
+					<el-col :span="6">
+						<el-form-item th:label="#{사용 가능 여부}">
+							<combo :data="mainVue.code.useYn" th:label="#{전체}" :model="searchForm.useYn" @change="searchForm.useYn = $event"></combo>
+						</el-form-item>
+					</el-col>
+				</el-row>
+			</el-form>
+		</div>
+		
+		<!-- 버튼 -->
+		<div class="buttons" ref="buttons">
+			<el-button th:if='${sa_actions.contains("CategoryForSotreSearch")}' :size="size" th:text="#{검색}" @click="search" icon="el-icon-search" ></el-button>
+			<el-button th:if='${sa_actions.contains("CategoryForSotreAdd")}' :size="size" th:text="#{등록}" @click="add" icon="el-icon-circle-plus-outline" :disabled="btn.addDisabled" ></el-button>
+			<el-button th:if='${sa_actions.contains("CategoryForSotreUp")}' :size="size" th:text="#{수정}" @click="up" icon="el-icon-edit-outline" :disabled="btn.upDisabled" ></el-button>
+			<el-button  :size="size" th:text="#{삭제}" @click="checkMenuCnt4Categorys" icon="el-icon-remove-outline" :disabled="btn.delDisabled" ></el-button>
+			<el-button  :size="size" th:text="#{그룹순서설정}" @click="changeOrd4Category"></el-button>
+		</div>
+		
+		<!-- 리스트 -->
+		<el-table :height="tableHeight" border stripe highlight-current-row tooltip-effect="dark"
+				:data="tableData" :size="size" th:empty-text="#{데이타 없음}"
+				@row-click="handleRowClick" @select="handleRowChecked" @select-all="handleRowChecked">
+			<el-table-column :label="tableData.length" type="index" 	width="55" align="center" sortable label-class-name="data_cnt"></el-table-column>
+			<el-table-column type="selection" 							width="45" align="center"></el-table-column>
+			<el-table-column th:label="#{상품그룹명}" 		prop="categoryNmLan" 	min-width="200" show-overflow-tooltip></el-table-column>
+			<!-- <el-table-column th:label="#{표시 순서}" 		prop="ord" 			min-width="100" align="center"></el-table-column> -->
+			<el-table-column th:label="#{사용 가능 여부}" 	prop="useYn" 		min-width="100" align="center" :formatter="mainVue.formatterCode"></el-table-column>
+			<el-table-column th:label="#{설명}" 			prop="categoryDesc" min-width="300" show-overflow-tooltip></el-table-column>
+		</el-table>
+		
+		<!-- 입력 팝업 -->
+		<el-dialog :title="inputForm.title" :visible.sync="dialogFormVisible" width="1000px">
+			<el-form :model="inputForm" label-width="140px" label-suffix=":" :size="size" @submit.native.prevent>
+				<el-row :gutter="20">
+					<el-col :span="inputForm.categoryInfos.length > 0 ? 24 : 24">
+					<el-tabs v-model="activiTabSmenu" @tab-click="handleTabClick" >
+						<!-- <el-tabs value="info"> -->
+							<el-tab-pane th:label="#{기본 정보}" name="info">
+								<el-row :gutter="20">
+									<el-col :span="inputForm.categoryInfos.length > 0 ? 24 : 24">
+										<el-form-item th:label="#{상품그룹명}" :error="formError.categoryNm" required>
+											<el-input v-model="inputForm.categoryNm" maxlength="50" clearable="true" show-word-limit>
+												<el-button v-if="lans.length > 1" slot="append" :size="size" th:text="#{다국어 조회}" @click="dictionaryDialogFormVisible = true" icon="el-icon-search"></el-button>
+											</el-input>
+											
+											<!-- 사전 선택 -->
+											<el-dialog th:title="#{다국어 사전}" :visible.sync="dictionaryDialogFormVisible" width="900px" append-to-body>
+												<div class="search_form" style="margin-bottom: 10px;">
+													<el-form :inline="true" label-width="60px" label-suffix=":" :size="size" @submit.native.prevent>
+														<el-form-item th:label="#{언어}">
+															<el-input v-model="searchText" @keyup.enter.native="searchDictionary" clearable="true" style="width: 190%;">
+																<el-button slot="append" :size="size" th:text="#{검색}" @click="searchDictionary" icon="el-icon-search"></el-button>
+															</el-input>
+														</el-form-item>
+													</el-form>
+												</div>
+									
+												<el-table :height="tableHeight/2" border stripe highlight-current-row tooltip-effect="dark"
+														:data="popTableData" :size="size" th:empty-text="#{언어 코드}">
+									      
+													<el-table-column fixed>
+														<template slot-scope="scope">
+															<el-button :size="size" th:text="#{선택}" @click="selectDictionary(scope.row)"></el-button>
+														</template>
+													</el-table-column>
+									
+													<el-table-column th:label="#{언어 코드}" prop="id" min-width="200" sortable show-overflow-tooltip></el-table-column>
+													<el-table-column v-for="item in lans" :label="item.nm" :prop="item.id" min-width="200" sortable show-overflow-tooltip></el-table-column>
+												</el-table>
+									
+											</el-dialog>
+										</el-form-item>
+										
+										<!-- <el-form-item th:label="#{표시 순서}" :error="formError.ord" required>
+											<el-input-number v-model="inputForm.ord" :min="1" :max="99"></el-input-number>
+										</el-form-item> -->
+										
+										<el-form-item th:label="#{사용 가능 여부}" required>
+											<combo :data="mainVue.code.useYn" :model="inputForm.useYn" @change="inputForm.useYn = $event"></combo>
+										</el-form-item>
+										
+										<el-form-item th:label="#{설명}" :error="formError.categoryDesc">
+											<el-input v-model="inputForm.categoryDesc" type="textarea" maxlength="250" show-word-limit rows="5"></el-input>
+										</el-form-item>
+									</el-col>
+								</el-row>
+								
+								<el-row :gutter="20">
+									<el-col :span="24" v-if="inputForm.categoryInfos.length > 0">
+										<el-tabs v-model="activiTab">
+											<el-tab-pane v-for="(item, index) in inputForm.categoryInfos" :key="item.lanTp.id" :label="item.lanTp.nm" :name="item.lanTp.id">
+												<el-form-item th:label="#{상품그룹명}" :error="formError['categoryInfos[' + index + '].categoryInfoNm']" required>
+													<el-input v-model="inputForm.categoryInfos[index].categoryInfoNm" maxlength="50" clearable="true" show-word-limit></el-input>
+												</el-form-item>
+											</el-tab-pane>
+										</el-tabs>
+									</el-col>
+								</el-row>
+								
+							</el-tab-pane>
+							
+							
+							<el-tab-pane th:label="#{상품 추가}" name="smenu" v-if="'U' === inputForm.statu" >
+								<el-transfer class="category-goods" :data="smenu"
+									:props="{ key: 'smenuCd', label: 'smenuNmLan' }"
+									v-model="inputForm.smenusCds"
+									:titles="[listTitle, dataTitle]"
+		    						:button-texts="[listBtn, dataBtn]">
+		    						
+		    						<!-- <span slot-scope="{ option }">{{ option.smenuNmLan }}{{ util.isEmpty(option.smenuImg) ? '' : ('(' + option.smenuImg + ')') }}</span> -->
+		    						
+								</el-transfer>
+							</el-tab-pane>	
+							
+							
+							<el-tab-pane th:label="#{선택상품 순서변경}" name="ord" v-if="'U' === inputForm.statu" >
+								<div>
+								      <h3>상품 노출 순서</h3>
+								      <p>상품을 마우스로 드래그하여 순서를 변경하세요.</p>
+								      <draggable tag="ul" class="list-group" 
+								      				:list="inputOrdForm.ordSmenuInCategory" 
+								      				ghost-class="ghost"
+											        @start="dragging = true"
+											        @end="dragging = false">
+								        <li
+								          v-for="(element, index) in inputOrdForm.ordSmenuInCategory"
+								          :key="element.smenuCd"
+								        >
+								          {{ element.smenuNmLan }} 
+								        </li>
+								      </draggable>
+								 </div>
+							</el-tab-pane>	
+							
+							
+								
+						</el-tabs>
+					</el-col>
+					
+				</el-row>
+			</el-form>
+			
+			
+			
+			<div slot="footer" class="dialog-footer">
+				<el-button th:text="#{저장}" icon="el-icon-check" :size="size" @click="save" :disabled="btn.saveDisabled"></el-button>
+				<el-button th:text="#{상품순서저장}" icon="el-icon-check" :size="size" @click="saveOrd" :disabled="btn.saveOrdDisabled"></el-button>
+				<el-button th:text="#{닫기}" icon="el-icon-close" :size="size" @click="closeDialog"></el-button>
+			</div>
+		</el-dialog>
+		
+	
+		<el-dialog :title="inputCategoryOrdForm.title" :visible.sync="dialogCategoryOrdFormVisible" width="800px">
+			<el-form :model="inputCategoryOrdForm" label-width="140px" label-suffix=":" :size="size" @submit.native.prevent>
+				<el-row :gutter="20">
+					<el-col >
+					<el-tabs v-model="activiTabCategoryOrd">			
+							<el-tab-pane th:label="#{그룹순서 설정}" name="ord" >
+								<div>
+								      <p>상품그룹명을 드래그하여 순서를 변경하세요.</p>
+								      <draggable class="list-group" 
+								      				:list="inputCategoryOrdForm.categorys" 
+								      				ghost-class="ghost"
+											        @start="dragging = true"
+											        @end="dragging = false">
+								        <li v-for="(element, index) in inputCategoryOrdForm.categorys" :key="element.categoryCd">
+								          {{ element.categoryNmLan }} 
+								        </li>
+								      </draggable>
+								 </div>
+							</el-tab-pane>	
+								
+						</el-tabs>
+					</el-col>
+					
+				</el-row>
+			</el-form>
+			
+			<div slot="footer" class="dialog-footer">
+				<el-button th:text="#{그룹순서저장}" icon="el-icon-check" :size="size" @click="saveCategoryOrd" :disabled="btn.saveCategoryOrdDisabled"></el-button>
+				<el-button th:text="#{닫기}" icon="el-icon-close" :size="size" @click="dialogCategoryOrdFormVisible = false"></el-button>
+			</div>
+			
+		</el-dialog>
+		
+	</div>
+	
+    <script type="text/javascript">
+	/*<![CDATA[*/
+		new Vue({
+			el: '#app',
+			data: function () {
+				var data = parent.mainVue.initData();
+				data.url = '/category/store';
+				data.storeLans = [];
+				data.activiTab = '';
+				data.activiTabSmenu = 'info';
+				data.activiTabCategoryOrd = 'ord';
+				data.smenu = [];				
+				
+				data.searchForm = this.initSearchForm();
+				data.inputForm = this.initInputForm();
+				data.inputOrdForm = this.initInputOrdForm();
+				data.inputCategoryOrdForm = this.initInputCategoryOrdForm();
+				data.formError = this.initFormError();
+				
+				data.lans = [];
+				data.popTableData = [];
+				
+				data.dictionaryDialogFormVisible = false;
+				data.dialogCategoryOrdFormVisible = false;
+				data.searchText = '';
+				
+				data.listTitle = '[[#{상품 리스트}]]';
+				data.dataTitle = '[[#{상품}]]';
+				data.listBtn = '[[#{제거}]]';
+				data.dataBtn = '[[#{추가}]]';
+				
+				return data;
+			},
+			created: function () {
+				this.initStore();
+				this.initMenu();
+				this.search();
+			},
+			mounted: function () {
+				setTimeout(function () {
+					this.$nextTick(function () {
+						this.mainVue.currVue = this;
+					}.bind(this));
+				}.bind(this), 500);
+			},
+			watch: {
+				formError: {
+					deep: true,
+					handler: function (newVal, oldVal) {
+						// 벨리데이션 메세지가 값은 있는데 Vue에서 표시 안해주는 현상 처리 하기 위함
+						setTimeout(function () {
+							var tmp = this.inputForm.categoryNm;
+							this.inputForm.categoryNm = this.inputForm.categoryNm + ' ';
+							this.inputForm.categoryNm = tmp;
+							
+							var i = 100;
+							for (val in newVal) {
+								if (val.indexOf('categoryInfos') > -1) {
+									if ('' != newVal[val]) {
+										if (i > val.replace(/[^0-9]*/g,"")) {
+											i = parseInt(val.replace(/[^0-9]*/g,""));
+										}
+									}
+								}
+							}
+							
+							if (100 != i) {
+								this.activiTab = this.inputForm.categoryInfos[i].lanTp.id;	
+							}
+						}.bind(this), 500);
+					}
+				}
+			},
+			methods: {
+				// 검색 조건 초기화
+				initSearchForm: function () {
+					return {
+						categoryNm: '',
+						useYn: 'Y'
+					}
+				},
+				// 입력폼 초기화
+				initInputForm: function () {
+					return {
+						statu: "I",
+						title: '',
+						categoryCd: 0,
+						categoryNm: '',
+						categoryInfos: [],
+						smenus: [],
+						smenusCds: [],
+						smenusOrd:[],
+						ordSmenuInCategory: [],
+						ord: 0,
+						useYn: 'Y',
+						categoryDesc: ''
+					}
+				},
+				
+				initInputOrdForm: function(){
+					return {
+						statu: "I",
+						title: '',
+						categoryCd: 0,
+						categoryNm: '',
+						categoryInfos: [],
+						smenus: [],
+						smenusCds: [],
+						smenusOrd:[],
+						ordSmenuInCategory: [],
+						ord: 0,
+						useYn: 'Y'
+					}
+				},
+				
+				initInputCategoryOrdForm: function(){
+					return {
+						statu: "I",
+						title: '',
+						categorys: []
+						
+					}
+				},
+				
+				// 오류 메세지 초기화
+				initFormError: function () {
+					return {
+						categoryNm: '',
+						ord: '',
+						useYn: '',
+						categoryDesc: ''
+					}
+				},
+				// 그리드 선택 이벤트
+				handleRowClick: function (val) {
+					if (null != val) {
+						this.btn.upDisabled = false;
+						this.btn.ordDisabled = false;
+					}
+					this.selectData = val;
+				},
+				// 체크 박스 체크 이벤트
+				handleRowChecked: function (selection, row) {
+					if (selection.length > 0) {
+						this.btn.delDisabled = false;	
+					} else {
+						this.btn.delDisabled = true;
+					}
+					
+					this.checkedData = [];
+					
+					for (var i = 0, len = selection.length; i < len; i++) {
+						this.checkedData[this.checkedData.length] = selection[i].categoryCd;
+					}
+				},
+				
+				// 메뉴 데이타 조회
+				initMenu: function () {
+					this.mainVue.$axios.search("/smenu/store", { categoryCd: '', smenuNm: '', useYn: 'Y' }, function (result) {
+						this.smenu = [];
+						
+						console.log("====initMenu====result.length:" + result.length);
+						
+						this.smenu = result;
+						
+						console.log("====initMenu====this.smenu.length:" + this.smenu.length);
+						
+					}.bind(this), false);
+				},
+				
+				initStore: function () {
+					this.mainVue.$axios.search('/store/getStore', null, function (result) {
+						this.storeLans = result.lans;
+						this.initStoreLans(result);
+					}.bind(this));
+				},
+				// 사전 조회를 위한 언어 정보 설정
+				initStoreLans: function (store) {
+					this.lans = [];
+					this.lans.push(store.defaultLan);
+					
+					for (var i = 0, len = store.lans.length; i < len; i++) {
+						this.lans.push(store.lans[i]);
+					}
+				},
+				
+				//수정 버튼 클릭시 나타나는 dialog창 탭클릭시 event
+				handleTabClick: function(obj,e){
+					
+					console.log("====obj.label" + obj.label);
+					console.log("====obj.name" + obj.name);
+					
+					if(obj.name == "ord"){			//선택상품 순서변경 탭
+						this.btn.saveDisabled = true;
+						this.btn.saveOrdDisabled = false;
+					}else{	//기본 정보, 상품 추가 탭
+						this.btn.saveDisabled = false;
+						this.btn.saveOrdDisabled = true;
+					}
+					
+				},
+				
+				//그룹순서변경 화면 호출
+				changeOrd4Category: function(){
+					
+					searchCateForm = {categoryNm: '', useYn: 'Y'};
+					
+					this.mainVue.$axios.search(this.url, searchCateForm, function (result) {
+						this.activiTabCategoryOrd = 'ord';
+						this.inputCategoryOrdForm = this.initInputCategoryOrdForm();
+						this.inputCategoryOrdForm.title = "[[#{그룹순서 변경}]]";
+						
+						
+						console.log("====카테고리====result.length:" + result.length);
+						
+						this.inputCategoryOrdForm.categorys = result;
+						
+						this.formError = this.initFormError();						
+					
+						this.dialogCategoryOrdFormVisible = true;
+						this.btn.saveCategoryOrdDisabled = false;
+					
+					}.bind(this), true);
+				},
+				
+				// 추가
+				add: function () {
+					this.activiTabSmenu = 'info';
+					this.inputForm = this.initInputForm();
+					this.inputForm.title = '[[#{상품그룹 추가}]]';
+
+					this.formError = this.initFormError();
+					
+					if (this.storeLans.length > 0) {
+						this.inputForm.categoryInfos = [];
+						
+						for (var i = 0, len = this.storeLans.length; i < len; i++) {
+							this.formError['categoryInfos[' + i + '].categoryInfoNm'] = '';
+							
+	 						this.inputForm.categoryInfos.push({
+	 							lanTp: this.storeLans[i],
+	 							categoryInfoNm: ''
+	 						});
+							
+	 						if (i === 0) {
+	 							this.activiTab = this.storeLans[i].id;
+	 						}
+						}
+					}
+					
+					// 순번 자동으로 검색된 내용중 제일 마지막으로 설정
+					for (var i = 0, len = this.tableData.length; i < len; i++) {
+						if (this.inputForm.ord < this.tableData[i].ord) {
+							this.inputForm.ord = this.tableData[i].ord;
+						}
+					}
+					
+					this.inputForm.ord++;
+					
+					this.dialogFormVisible = true;
+					this.btn.saveDisabled = false;
+					this.btn.saveOrdDisabled = true;
+				},
+				// 수정
+				up: function () {
+					this.mainVue.$axios.get(this.url + '/' + this.selectData.categoryCd, function (result) {
+						this.activiTabSmenu = 'info';
+						result.statu = "U";
+						result.title = "[[#{상품그룹 수정}]]";
+						
+						// 메뉴 설정
+						result.smenusCds = [];		
+						
+						console.log("========result.ordSmenuInCategory.length:" + result.ordSmenuInCategory.length);
+						/* if(result.ordSmenuInCategory.length > 0){
+							for (var i = 0, len = result.ordSmenuInCategory.length; i < len; i++) {								
+								console.log("========result.ordSmenuInCategory[" + i + "].smenuCd:" + result.ordSmenuInCategory[i].smenuCd);
+								result.smenusCds.push(result.ordSmenuInCategory[i].smenuCd);
+							}
+						}else{ */
+							for (var i = 0, len = result.smenus.length; i < len; i++) {
+								console.log("========result.smenus[" + i + "].smenuCd:" + result.smenus[i].smenuCd);
+								result.smenusCds.push(result.smenus[i].smenuCd);
+							}
+						//}
+						
+						this.formError = this.initFormError();
+						
+						console.log("========result.ord:" + result.ord);
+						
+						
+						this.inputForm = result;
+						
+						for (var i = 0, len = this.inputForm.smenusCds.length; i < len; i++) {	
+							console.log("========this.inputForm.smenusCds[" + i + "]:" + this.inputForm.smenusCds[i]);
+						}
+						
+						
+						this.inputOrdForm = this.initInputOrdForm();
+						this.inputOrdForm.title = "[[#{상품순서 변경}]]";
+						this.inputOrdForm.categoryCd = this.selectData.categoryCd;
+						
+						console.log("========result.ordSmenuInCategory.length:" + result.ordSmenuInCategory.length);
+						if(result.ordSmenuInCategory.length == result.smenuList.length){
+							for (var i = 0, len = result.ordSmenuInCategory.length; i < len; i++) {
+								this.inputOrdForm.ordSmenuInCategory.push(result.ordSmenuInCategory[i]);
+							}
+						}else{
+							console.log("========result.smenuList.length:" + result.smenuList.length);
+							for (var i = 0, len = result.smenuList.length; i < len; i++) {
+								this.inputOrdForm.ordSmenuInCategory.push(result.smenuList[i]);
+							}
+						}
+						
+						console.log("========this.inputOrdForm.ordSmenuInCategory.length:" + this.inputOrdForm.ordSmenuInCategory.length);
+						
+						//this.formError = this.initFormError();						
+					
+						//세번째 탭(선택상품순서변경 세팅)
+						//if(this.inputForm.smenusCds.length > 0){
+						//	for(var i = 0, len = this.inputForm.smenusCds.length ; i <len ; i++){
+						//		for (var j = 0, jlen = this.smenu.length; j < jlen; j++) {
+						//			if (this.inputForm.smenusCds[i] == this.smenu[j].smenuCd) {
+						//				this.inputForm.smenusOrd.push(this.smenu[j]);
+						//				break;
+						//			}
+						//		}
+						//	}
+						//}
+						
+						// 수정 시 매장 다국어 삭제 시 카테고리도 다국어 지워줌
+						var categoryInfosTmp = [];
+						
+						if (this.inputForm.statu == "U") {
+							categoryInfosTmp = util.copyObj(this.inputForm.categoryInfos);	
+						}
+						
+						this.inputForm.categoryInfos = [];
+						
+						for (var i = 0, len = this.storeLans.length; i < len; i++) {
+							this.formError['categoryInfos[' + i + '].categoryInfoNm'] = '';
+							
+							var categoryInfoNm = '';
+							
+							if (this.inputForm.statu == "U") {
+								for (var k = 0, klen = categoryInfosTmp.length; k < klen; k++) {
+									if (categoryInfosTmp[k].lanTp.id == this.storeLans[i].id) {
+										categoryInfoNm = categoryInfosTmp[k].categoryInfoNm;
+									}
+								}
+							}
+	 						
+							this.inputForm.categoryInfos.push({
+	 							lanTp: this.storeLans[i],
+	 							categoryInfoNm: categoryInfoNm
+	 						});
+							
+	 						if (i === 0) {
+	 							this.activiTab = this.storeLans[i].id;
+	 						}
+						}
+						
+						
+						this.dialogFormVisible = true;
+						this.btn.saveDisabled = false;
+						this.btn.saveOrdDisabled = true;
+						
+					}.bind(this), true);
+				},				
+				
+				
+				// 조회
+				search: function () {
+					this.mainVue.$axios.search(this.url, this.searchForm, function (result) {
+						this.tableData = result;
+						
+						this.btn.addDisabled = false;
+						this.btn.upDisabled = true;
+						this.btn.delDisabled = true;
+						this.btn.ordDisabled = true;
+						
+						this.inputForm = this.initInputForm();
+						this.inputOrdForm = this.initInputOrdForm();
+						this.formError = this.initFormError();
+					}.bind(this), false);
+				},
+				
+				
+				//카테고리 해당 메뉴 개수 구하기(23.10.10)
+				checkMenuCnt4Categorys: function () {
+					this.mainVue.$axios.search(this.url + '/menuCnt4Categorys/' + this.checkedData.join(","), null, function (result) {
+						
+						console.log("====menuCnt4Categorys====result.length:" + result.length);	
+						
+						menuCnt4Categorys = [];
+						menuCnt4Categorys = result;
+						
+						for (var i = 0, len = result.length; i < len; i++) {
+							console.log("====menuCnt4Categorys====result["+i+"]:" + result[i]);	
+							
+							if(result[i] > 0){
+								this.mainVue.$message({ type: 'error', message: "[[#{상품그룹 하위에  상품이 있습니다. 상품그룹 삭제전에 하위에 있는 상품을 삭제해주세요. }]]" });
+								return;								
+							}else{
+								this.del();
+							}
+							
+						}
+						
+					}.bind(this), false);
+				},
+				
+				// 삭제
+				del: function () {
+					this.mainVue.$confirm("[[#{{0}를 삭제 하시겠습니까?(#{상품그룹 정보})}]]", this.mainVue.appMsg.systemAlterTitle, {
+				          confirmButtonText: "[[#{삭제}]]",
+				          cancelButtonText: "[[#{취소}]]",
+				          type: 'info'
+				        }).then(function () {
+				        	this.mainVue.$axios.del(this.url + '/' + this.checkedData.join(","), function (result) {
+				        		this.mainVue.$message({ type: 'success', message: "[[#{삭제 성공}]]" });
+				        		this.search();
+							}.bind(this), true);
+				        }.bind(this)).catch(function () {
+				        	this.mainVue.$message({ type: 'info', message: "[[#{삭제 취소}]]" });
+				        }.bind(this));
+				},
+				// 저장
+				save: function () {
+					this.formError = this.initFormError();
+					
+					for (var i = 0, len = this.inputForm.categoryInfos.length; i < len; i++) {
+						this.formError['categoryInfos[' + i + '].categoryInfoNm'] = '';
+					}
+					
+					if ('I' === this.inputForm.statu) {
+						this.mainVue.$axios.add(this.url, this.inputForm, this.formError, function (result) {
+							this.mainVue.$message({ type: 'success', message: "[[#{등록 성공}]]" });
+							this.dialogFormVisible = false;
+							this.search();
+						}.bind(this), true);
+					} else {						
+						// 메뉴 설정
+						this.inputForm.smenus = [];
+						this.inputForm.ordSmenuInCategory = [];
+						for (var i = 0, len = this.inputForm.smenusCds.length; i < len; i++) {
+							for (var j = 0, jlen = this.smenu.length; j < jlen; j++) {
+								if (this.inputForm.smenusCds[i] == this.smenu[j].smenuCd) {
+									
+									console.log("===========this.smenu[" + j + "] :" + this.smenu[j]);
+									
+									this.inputForm.smenus.push(this.smenu[j]);
+									this.inputForm.ordSmenuInCategory.push(this.smenu[j]);
+									break;
+								}
+							}
+						}
+						
+						//for (var i = 0, len = this.inputOrdForm.ordSmenuInCategory.length; i < len; i++) {
+						//	this.inputOrdForm.ordSmenuInCategory[i].ord = i; //상품 순번 세팅
+						//}
+						
+						//for (var i = 0, len = this.inputOrdForm.ordSmenuInCategory.length; i < len; i++) {
+						//	this.inputForm.ordSmenuInCategory.push(this.inputOrdForm.ordSmenuInCategory[i]); 
+						//}
+						
+						console.log("========save========this.inputForm.smenus:" + this.inputForm.smenus.length);
+						console.log("========save========this.inputForm.ordSmenuInCategory:" + this.inputForm.ordSmenuInCategory.length);
+						console.log("========save========this.inputForm.ord:" + this.inputForm.ord);
+						
+						this.mainVue.$axios.up(this.url + '/' + this.inputForm.categoryCd, this.inputForm, this.formError, function (result) {
+							this.mainVue.$message({ type: 'success', message: "[[#{수정 성공}]]" });
+							this.dialogFormVisible = true;
+							this.up();
+						}.bind(this), true);
+					}
+				},
+				
+				//상품 순번 저장
+				saveOrd: function(){
+					
+					if(this.inputOrdForm.ordSmenuInCategory.length > 0){						
+						for (var i = 0, len = this.inputOrdForm.ordSmenuInCategory.length; i < len; i++) {
+							this.inputOrdForm.ordSmenuInCategory[i].ord = i + 1 ; //상품 순번 세팅
+						}
+						
+						this.mainVue.$axios.up(this.url + '/ord/' + this.selectData.categoryCd, this.inputOrdForm, this.formError, function (result) {
+							this.mainVue.$message({ type: 'success', message: "[[#{상품 순번 수정 성공}]]" });
+							this.dialogFormVisible = false;
+							this.up();
+						}.bind(this), true);
+						
+					}
+					
+				},
+				
+				//그룹순번 저장
+				saveCategoryOrd: function(){
+					
+					if(this.inputCategoryOrdForm.categorys.length > 0){						
+						for (var i = 0, len = this.inputCategoryOrdForm.categorys.length; i < len; i++) {
+							this.inputCategoryOrdForm.categorys[i].ord = i + 1; //카테고리 순번 세팅
+						}
+						
+						this.mainVue.$axios.add(this.url + '/categoryOrd', this.inputCategoryOrdForm.categorys, this.formError, function (result) {
+							this.mainVue.$message({ type: 'success', message: "[[#{그룹 순번 수정 성공}]]" });
+							this.dialogCategoryOrdFormVisible = false;
+							this.btn.saveCategoryOrdDisabled = true;
+							this.search();
+							
+						}.bind(this), true);
+						
+					}
+					
+				},
+				
+				//팝업창 닫기
+				closeDialog: function(){
+					this.dialogFormVisible = false;
+					this.search();
+				},
+				
+				searchDictionary: function () {
+					this.mainVue.$axios.search("/dictionary/search", { nm: this.searchText, dictionaryTpVal: "category" }, function (result) {
+						this.popTableData = [];
+						
+						for (var i = 0, len = result.length; i < len; i++) {
+							var tmp = result[i];
+							
+							tmp[result[i].lan.id] = result[i].nm;
+							
+							for (var j = 0, jlen = result[i].dictionarys.length; j < jlen; j++) {
+								tmp[result[i].dictionarys[j].lan.id] = result[i].dictionarys[j].nm;
+							}
+							
+							this.popTableData.push(tmp);
+						}
+					}.bind(this), true);
+				},
+				// 키워드 데이타 선택
+				selectDictionary: function (row) {
+					for (var i = 0, len = this.lans.length; i < len; i++) {
+						// 기본 언어 새팅
+						if (0 == i) {
+							this.inputForm.categoryNm = row[this.lans[i].id];
+						} else {
+							// 타언어 순서대로 등록
+							this.inputForm.categoryInfos[i-1].categoryInfoNm = row[this.lans[i].id];
+						}
+					}
+					
+					this.dictionaryDialogFormVisible = false;
+				}
+		    }
+		});
+	/*]]>*/
+	</script>
+</body>
+</html>

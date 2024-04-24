@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:include="main/import :: head"></head>
+<body>
+	<div id="app" class="contain">
+		<!-- 검색 조건 -->
+		<div ref="search_form"></div>
+		
+		<!-- 버튼-->
+		<div class="buttons" ref="buttons">
+			<el-button th:if='${sa_actions.contains("MenuSearch")}' :size="size" th:text="#{검색}" @click="search" icon="el-icon-search" ></el-button>
+			<el-button th:if='${sa_actions.contains("MenuAdd")}' :size="size" th:text="#{등록}" @click="add" icon="el-icon-circle-plus-outline" :disabled="btn.addDisabled" ></el-button>
+			<el-button th:if='${sa_actions.contains("MenuUp")}' :size="size" th:text="#{수정}" @click="up" icon="el-icon-edit-outline" :disabled="btn.upDisabled" ></el-button>
+			<el-button th:if='${sa_actions.contains("MenuDel")}' :size="size" th:text="#{삭제}" @click="del" icon="el-icon-remove-outline" :disabled="btn.delDisabled" ></el-button>
+			<el-button th:if='${sa_actions.contains("MenuSearch")}' :size="size" @click="doExpand(!expand)" icon="el-icon-check">{{ !expand ? '[[#{보기}]]' : '[[#{접기}]]' }}</el-button>
+			<el-button th:if='${sa_actions.contains("MenuAdd") || sa_actions.contains("MenuUp")}' :size="size" th:text="#{저장}" @click="save" icon="el-icon-check" :disabled="btn.saveDisabled" style="float: right;"></el-button>
+		</div>
+		
+		<!-- 리스트 -->
+		<el-row :gutter="20">
+			<el-col :span="16">
+				<el-table :height="tableHeight" border stripe highlight-current-row tooltip-effect="dark"
+						ref="refTable" :data="tableData" :size="size" th:empty-text="#{데이타 없음}"
+						@row-click="handleRowClick" @row-dblclick="handleRowDbClick"
+						@select="handleRowChecked" @select-all="handleRowChecked"
+						row-key="resourcesCd" :tree-props="{ children: 'subMenu' }">
+					<el-table-column :label="tableData.length" type="index" 	width="55" align="center" sortable fixed label-class-name="data_cnt"></el-table-column>
+					<el-table-column type="selection" 		width="45" 		align="center" fixed></el-table-column>
+					<el-table-column th:label="#{코드}" 		prop="resourcesCd" 	width="100" align="left" fixed></el-table-column>
+					<el-table-column th:label="#{메뉴명}" 	prop="menuNmLan" 	min-width="150" show-overflow-tooltip></el-table-column>
+					<el-table-column th:label="#{아이콘}" 	prop="menuIcon" min-width="130" show-overflow-tooltip></el-table-column>
+					<el-table-column th:label="#{주소}" 		prop="url" 		min-width="150" show-overflow-tooltip></el-table-column>
+					<el-table-column th:label="#{호출 타입}" 	prop="method" 	min-width="80" align="center"></el-table-column>
+					<el-table-column th:label="#{메뉴 레벨}" 	prop="mlevel" 	min-width="80" align="center"></el-table-column>
+					<el-table-column th:label="#{순서}" 		prop="ord" 		min-width="50" align="center"></el-table-column>
+					<el-table-column th:label="#{사용 가능 여부}" prop="useYn" 	min-width="110" align="center" :formatter="mainVue.formatterCode"></el-table-column>
+					<el-table-column th:label="#{메뉴 설명}" 	prop="resDesc" 	min-width="300" show-overflow-tooltip></el-table-column>
+				</el-table>
+			</el-col>
+			<el-col :span="8">
+				<el-card shadow="never" :style="{ height: inputHeight + 'px' }">
+					<div slot="header">
+						<span th:text="#{메뉴}"></span>
+						<span v-if="'I' == inputForm.statu" th:text="#{추가}"></span>
+						<span v-if="'U' == inputForm.statu" th:text="#{수정}"></span>
+					</div>
+					<div>
+						<el-form :model="inputForm" label-width="120px" label-suffix=":"
+								:size="size" :disabled="fromDisabled" @submit.native.prevent>
+							<el-form-item th:label="#{상위  메뉴}" v-if="null != inputForm.topMenu" required>
+								<span>{{ inputForm.topMenu.menuNm }}</span>
+							</el-form-item>
+							<el-form-item th:label="#{메뉴명}" :error="formError.menuNm" required>
+								<el-input v-model="inputForm.menuNm" maxlength="50" clearable="true" show-word-limit></el-input>
+							</el-form-item>
+							<el-form-item th:label="#{아이콘}" :error="formError.menuIcon">
+								<el-input v-model="inputForm.menuIcon" maxlength="50" clearable="true" show-word-limit></el-input>
+							</el-form-item>
+							<el-form-item th:label="#{주소}" :error="formError.url" required>
+								<el-input v-model="inputForm.url" maxlength="50" clearable="true" show-word-limit></el-input>
+							</el-form-item>
+							<el-form-item th:label="#{호출 타입}" :error="formError.method" required>
+								<combo :data="mainVue.code.method" :model="inputForm.method" @change="inputForm.method = $event"></combo>
+							</el-form-item>
+							<el-form-item th:label="#{순서}" :error="formError.ord" required>
+								<el-input-number v-model="inputForm.ord" :min="1" :max="99"></el-input-number>
+							</el-form-item>
+							<el-form-item th:label="#{사용 가능 여부}" required>
+								<combo :data="mainVue.code.useYn" :model="inputForm.useYn" @change="inputForm.useYn = $event"></combo>
+							</el-form-item>
+							<el-form-item th:label="#{메뉴 설명}">
+								<el-input v-model="inputForm.resDesc" type="textarea" maxlength="250" show-word-limit></el-input>
+							</el-form-item>
+						</el-form>
+					</div>
+				</el-card>
+			</el-col>
+		</el-row>
+	</div>
+	
+    <script type="text/javascript" charset="UTF-8">
+	/*<![CDATA[*/
+		new Vue({
+			el: '#app',
+			data: function () {
+				var data = parent.mainVue.initData();
+				data.url = "/menu";
+				
+				data.inputForm = this.initInputForm();
+				data.formError = this.initFormError();
+				
+				data.expand = false;
+				
+				return data;
+			},
+			created: function () {
+				this.search();
+			},
+			mounted: function () {
+				setTimeout(function () {
+					this.$nextTick(function () {
+						this.mainVue.currVue = this;
+					}.bind(this));	
+				}.bind(this), 500);
+			},
+			watch: {
+				'inputForm.url': function (newVal, oldVal) {
+					if ('' != newVal) {
+						this.chkUrlMethod();
+					}
+				},
+				'inputForm.method': function (newVal, oldVal) {
+					if ('' != newVal) {
+						this.chkUrlMethod();
+					}
+				}
+			},
+			methods: {
+				// 입력폼 초기화
+				initInputForm: function () {
+					return {
+						statu: "I",
+						resourcesCd: 0,
+						topMenu: null,
+						menuCd: 0,
+						menuNm: '',
+						menuIcon: '',
+						mlevel: 1,
+						ord: 1,
+						url: '',
+						method: 'NONE',
+						useYn: 'Y',
+						resDesc: ''
+					}
+				},
+				// 오류 메세지 초기화
+				initFormError: function () {
+					return {
+						menuNm: '',
+						url: '',
+						method: '',
+						mlevel: '',
+						ord: '',
+						resDesc: ''
+					}
+				},
+				// 그리드 선택 이벤트
+				handleRowClick: function (val) {
+					if (null != val) {
+						this.btn.upDisabled = false;
+					}
+					this.selectData = val;
+				},
+				// 그리드 두번 클릭 이벤트
+				handleRowDbClick: function (val) {
+					this.btn.upDisabled = true;
+					this.selectData = null;
+					this.$refs.refTable.setCurrentRow();
+				},
+				// 체크 박스 체크 이벤트
+				handleRowChecked: function (selection, row) {
+					if (selection.length > 0) {
+						this.btn.delDisabled = false;	
+					} else {
+						this.btn.delDisabled = true;
+					}
+					
+					this.checkedData = [];
+					
+					for (var i = 0, len = selection.length; i < len; i++) {
+						this.checkedData[this.checkedData.length] = selection[i].resourcesCd;
+					}
+				},
+				// 추가
+				add: function () {
+					this.inputForm = this.initInputForm();
+					this.formError = this.initFormError();
+					
+					if (null != this.selectData) {
+						if (this.selectData.mlevel > 1) {
+							this.mainVue.$message({ type: 'warning', message: "[[#{{0}차 메뉴까지 등록 할 수 있습니다.(2)}]]" });
+							this.btn.saveDisabled = true;
+							this.fromDisabled = true;
+							return;
+						} else {
+							this.inputForm.topMenu = this.selectData;
+							this.inputForm.mlevel = this.selectData.mlevel + 1;
+						}
+					}
+					
+					this.btn.saveDisabled = false;
+					this.fromDisabled = false;
+				},
+				// 수정
+				up: function () {
+					this.mainVue.$axios.get(this.url + '/' + this.selectData.resourcesCd, function (result) {
+						result.statu = "U";
+						
+						this.inputForm = result;
+						
+						this.formError = this.initFormError();
+						
+						this.btn.saveDisabled = false;
+						this.fromDisabled = false;
+					}.bind(this), true);
+				},
+				// 조회
+				search: function () {
+					this.mainVue.$axios.search(this.url, null, function (result) {
+						this.tableData = result;
+						
+						this.btn.addDisabled = false;
+						this.btn.upDisabled = true;
+						this.btn.delDisabled = true;
+						this.btn.saveDisabled = true;
+						this.fromDisabled = true;
+						
+						this.inputForm = this.initInputForm();
+						this.formError = this.initFormError();
+						
+						// 접기
+						this.expand = false;
+						this.doExpand(this.expand);
+					}.bind(this), false);
+				},
+				// 삭제
+				del: function () {
+					this.mainVue.$confirm("[[#{{0}를 삭제 하시겠습니까?(#{메뉴 정보})}]]", this.mainVue.appMsg.systemAlterTitle, {
+				          confirmButtonText: "[[#{삭제}]]",
+				          cancelButtonText: "[[#{취소}]]",
+				          type: 'info'
+				        }).then(function () {
+				        	this.mainVue.$axios.del(this.url + "/" + this.checkedData.join(","), function (result) {
+				        		this.mainVue.$message({ type: 'success', message: "[[#{삭제 성공}]]" });
+				        		this.search();
+							}.bind(this), true);
+				        }.bind(this)).catch(function () {
+				        	this.mainVue.$message({ type: 'info', message: "[[#{삭제 취소}]]" });
+				        }.bind(this));
+				},
+				// 저장
+				save: function () {
+					this.formError = this.initFormError();
+					
+					if ('I' === this.inputForm.statu) {
+						this.mainVue.$axios.add(this.url, this.inputForm, this.formError, function (result) {
+							this.mainVue.$message({ type: 'success', message: "[[#{등록 성공}]]" });
+							this.search();
+						}.bind(this), true);
+					} else {
+						this.mainVue.$axios.up(this.url + "/" + this.inputForm.resourcesCd, this.inputForm, this.formError, function (result) {
+							this.mainVue.$message({ type: 'success', message: "[[#{수정 성공}]]" });
+							this.search();
+						}.bind(this), true);
+					}
+				},
+				chkUrlMethod: function () {
+					if ("" != this.inputForm.url && this.inputForm.method) {
+						this.mainVue.$axios.patchNonLoading('/resources/chk/' + this.inputForm.url.replace(/[/]/g, "-") + '/'  + this.inputForm.method, null, null, function (result) {
+							if ("" == result || result.resourcesCd == this.inputForm.resourcesCd) {
+								this.formError.url = '';
+								this.formError.method = '';
+								this.btn.saveDisabled = false;
+							} else {
+								this.formError.url = "[[#{이미 사용중인 {0},{1} 조합 입니다.(#{주소},#{호출 타입})}]]";
+								this.formError.method = "[[#{이미 사용중인 {0},{1} 조합 입니다.(#{주소},#{호출 타입})}]]";
+								this.btn.saveDisabled = true;
+							}
+						}.bind(this), false);
+					}
+				},
+				doExpand: function (expand) {
+					this.expand = expand;
+					
+					for (var i = 0, len = this.$refs.refTable.tableData.length; i < len; i++) {
+						if (null != this.$refs.refTable.tableData[i].subMenu &&
+								this.$refs.refTable.tableData[i].subMenu.length > 0) {
+							this.$refs.refTable.toggleRowExpansion(this.$refs.refTable.tableData[i], this.expand);
+						}						
+					}
+				}
+		    }
+		});
+	/*]]>*/
+	</script>
+</body>
+</html>

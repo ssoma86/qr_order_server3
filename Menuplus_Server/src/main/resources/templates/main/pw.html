@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    
+    <meta http-equiv="pragma" content="no-cache">
+    <meta http-equiv="Cache-Control" content="no-cache, must-revalidate">
+    <meta http-equiv="expires" content="Wed, 14 Nov 1981 00:00:00 GMT">
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0">
+    <meta name="description" content="MenuPlus" />
+    <meta name="author" content="lf" />
+
+    <title>MenuPlus</title>
+
+    <!-- 아리바바 폰트 -->
+    <link rel="stylesheet" type="text/css" href="/libs/icon-font/iconfont.css">
+    <!-- (vue)elements ui css -->
+    <link rel="stylesheet" type="text/css" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+    
+	<!-- 로그인 페이지 css -->
+    <style type="text/css">
+        body { min-width: 1600px; padding-top: 100px; background-color: #f0f0f0; color: #303133; }
+        .full_loading { width: 100%; height: 100%; background-color: white; position: absolute; left: 0; top: 0; z-index: 999; }
+        .contain { width: 300px; padding: 40px; margin: 0 auto; background-color: #ffffff; border-radius: 5px;
+			-moz-box-shadow: 5px 5px 5px #e7e7e7; -webkit-box-shadow: 5px 5px 5px #e7e7e7; box-shadow: 5px 5px 5px #e7e7e7; }
+        .login-title { text-align: center; margin-bottom: 30px; font-size: 24px; font-weight: bold; }
+        .login-title img { width: 90px; }
+        .el-input { margin-bottom: 20px; }
+        .iconfont { padding-left: 4px; }
+        .forget_pw { text-align: right; margin-bottom: 20px; }
+        .msg { width: 100%; height: 20px; text-align: left; float: left; font-size: 14px; line-height: 14px; color: red; }
+        .btn_login { width: 100%; }
+        .forgetMsg { height: 80px; }
+    </style>
+    
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/es6-promise@4/dist/es6-promise.min.js"></script>
+	<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/es6-promise@4/dist/es6-promise.auto.min.js"></script>
+	
+    <!-- vue.js -->
+	<!-- <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/vue"></script> -->
+	<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/vue@2.6.0"></script>
+    <!-- axios.js -->
+    <script type="text/javascript" src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <!-- (vue)elements ui js -->
+    <script type="text/javascript" src="https://unpkg.com/element-ui/lib/index.js"></script>
+
+	<script type="text/javascript" src="/js/axiosUtil.js"></script>
+</head>
+<body>
+    <div id="app" class="contain">
+    	<!-- 처음 로딩시 레이아웃이 깨진 화면이 깜빡하는 현상, 하얀 로딩창 먼저 보여줌  -->
+		<div v-if="full_loading" class="full_loading"></div>
+		
+        <!-- title -->
+        <div class="login-title">
+            <img src="/img/logo-img.png"/>
+        </div>
+
+        <div class="forget-panel">
+			<el-select v-model="locale" @change="lanChange" style="width: 100%;">
+				<el-option v-for="item in lan" :key="item.id" :label="item.nm" :value = "item.id"></el-option>
+			</el-select>
+        	
+            <el-input th:placeholder="#{새 비밀번호}" name="accountPw" v-model="accountPw" clearable="true" autofocus="true" type="password">
+                <i class="el-input__icon icon iconfont icon-lock" slot="prefix"></i>
+            </el-input>
+
+            <el-input th:placeholder="#{새 비밀번호 확인}" name="accountPwConfirm" v-model="accountPwConfirm" clearable="true" type="password">
+                <i class="el-input__icon icon iconfont icon-lock" slot="prefix"></i>
+            </el-input>
+
+			<!-- 오류 메세지 표시 구역, 오류 발생 시에만 표시 -->
+			<span id="msg" class="msg">{{ forgetMsg }}</span>
+				
+            <el-button type="primary" th:text="#{비밀번호 재설정}" @click="forgetForEmail" class="btn_login"></el-button>
+        </div>
+        
+    </div>
+    <script type="text/javascript"  charset="UTF-8">
+	/*<![CDATA[*/
+
+		const appMsg = {
+		    loadingMsg: '[[#{처리중 입니다...}]]',
+		    systemAlterTitle: '[[#{시스템 메세지}]]',
+		    systemBtnOk: '[[#{확인}]]',
+		    systemBtnClose: '[[#{닫기}]]'
+		}
+		
+        new Vue({
+            el: '#app',
+            data: function() {
+				return {
+					full_loading: true,		// 로딩 이미지 표시 상태
+					loading_: null,
+					lan: [],
+	                locale: '[[${locale}]]',
+	                cd: '[[${cd}]]',
+	                accountPw: '',
+	                accountPwConfirm: '',
+	                forgetMsg: ''
+				}
+            },
+            created: function () {
+            	// axios 초기화
+				this.$axios = axiosUtil.init(this);
+				// 언어 콤보 초기화
+				this.initLanguage();
+			},
+			mounted: function () {
+				// 로딩 이미지 숨김
+				this.full_loading = false;
+			},
+            methods: {
+            	// 언어 정보 설정
+            	initLanguage: function () {
+            		this.$axios.search('/language', null, function (result) {
+                        this.lan = result;
+    				}.bind(this), false);
+            	},
+            	// Loading 표시
+				showLoading: function() {
+					this.loading_ = this.$loading({
+		                lock: true,
+		                text: appMsg.loadingMsg,
+		                spinner: 'el-icon-loading',
+		                background: 'rgba(0, 0, 0, 0.7)'
+		            });
+				},
+				// Loading 닫기
+				closeLoading: function() {
+					if (null != this.loading_) this.loading_.close();
+				},
+            	// 언어 바꿈 이벤트 설정
+            	lanChange: function (val) {
+            		location.href = '?locale=' + val;
+            	},
+            	// 비밀번호 메일로 전송
+            	forgetForEmail: function () {
+            		// 비밀번호와 확인 비밀번호 체크
+					if (this.accountPw != this.accountPwConfirm) {
+						this.forgetMsg = "[[#{비밀번호가 일치 하지 않습니다.}]]";
+						
+						return;
+					}
+            		
+            		console.log('======this.cd:' + this.cd);
+            		console.log('======this.accountPw:' + this.accountPw);
+            		this.$axios.post('/pwChange', { tmpPassword: this.cd, accountPw: this.accountPw }, function (result) {
+            		// this.$axios.patchNonLoading('/pwChange/' + this.cd + '/' + this.accountPw, null, null, function (result) {
+            			this.forgetMsg = result;
+    				}.bind(this), true);
+            	}
+            }
+        });
+	/*]]>*/
+    </script>
+</body>
+</html>

@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:include="main/import :: head"></head>
+<body>
+	<script type="text/javascript" src="/libs/vue-cropper/index.js"></script>
+	
+	<style type="text/css">
+		.el-transfer-panel {
+			width: 300px;
+			height: 400px;
+		}
+		
+		.el-transfer-panel__body {
+			height: 354px;
+		}
+		
+		.el-transfer-panel__list {
+			height: 354px;
+		}
+		
+		.el-transfer-panel__item {
+			width: 240px;
+		}
+		
+		.el-input-number__decrease, .el-input-number__increase {
+			background: white;
+		}
+	</style>
+	
+	<div id="app" class="contain">
+		<!-- 검색 영역 -->
+		<div class="search_form" ref="search_form">
+			<el-form :inline="true" :model="searchForm" label-width="120px" label-suffix=":" :size="size" @submit.native.prevent>
+				<el-row>
+					<el-col :span="6">
+						<el-form-item th:label="#{매장}">
+							<el-select v-model="searchForm.storeCd" @change="search">
+								<el-option v-for="item in store" :key="item.storeCd" :label="item.storeNmLan" :value="item.storeCd"></el-option>
+							</el-select>
+						</el-form-item>
+					</el-col>
+					<el-col :span="6">
+						<el-form-item th:label="#{카테고리}">
+							<el-select v-model="searchForm.categoryCd" @change="search">
+								<el-option key=0 th:label="#{전체}" :value=null></el-option>
+								<el-option v-for="item in category" :key="item.categoryCd" :label="item.categoryNmLan" :value = "item.categoryCd"></el-option>
+							</el-select>
+						</el-form-item>
+					</el-col>
+					<el-col :span="6">
+						<el-form-item th:label="#{메뉴명}">
+							<el-input v-model="searchForm.smenuNm" @keyup.enter.native="search" clearable="true"></el-input>
+						</el-form-item>
+					</el-col>
+					<el-col :span="6">
+						<el-form-item th:label="#{사용 가능 여부}">
+							<combo :data="mainVue.code.useYn" th:label="#{전체}" :model="searchForm.useYn" @change="searchForm.useYn = $event"></combo>
+						</el-form-item>
+					</el-col>
+				</el-row>
+			</el-form>
+		</div>
+		
+		<!-- 버튼 -->
+		<div class="buttons" ref="buttons">
+			<el-button th:if='${sa_actions.contains("SmenuSearch")}' :size="size" th:text="#{검색}" @click="search" icon="el-icon-search" ></el-button>
+			<el-button th:if='${sa_actions.contains("SmenuAdd")}' :size="size" th:text="#{등록}" @click="add" icon="el-icon-circle-plus-outline" :disabled="btn.addDisabled" ></el-button>
+			<el-button th:if='${sa_actions.contains("SmenuUp")}' :size="size" th:text="#{수정}" @click="up" icon="el-icon-edit-outline" :disabled="btn.upDisabled" ></el-button>
+			<el-button th:if='${sa_actions.contains("SmenuDel")}' :size="size" th:text="#{삭제}" @click="del" icon="el-icon-remove-outline" :disabled="btn.delDisabled" ></el-button>
+			<el-button th:if='${sa_actions.contains("SmenuUse")}' :size="size" th:text="#{사용}" @click="use" icon="el-icon-check" :disabled="btn.delDisabled" ></el-button>
+			
+			<el-button th:if='${sa_actions.contains("SmenuSearch")}' :size="size" @click="showImg = !showImg" icon="el-icon-picture-outline">
+				{{ !showImg ? '[[#{이미지 보기}]]' : '[[#{이미지 숨김}]]' }}
+			</el-button>
+            
+            <template th:if='${sa_actions.contains("SmenuAdd") || sa_actions.contains("SmenuUp")}'>
+	            <el-popover placement="right" width="600" trigger="click" style="margin-left: 10px;">
+	            	<div>
+	            		<div style="margin: 10px;">
+	            			<label th:text="#{매장명}"></label>:&nbsp;&nbsp;
+	            			<el-select v-model="storeCd" :size="size">
+								<el-option v-for="item in store" :key="item.storeCd" :label="item.storeNmLan" :value="item.storeCd"></el-option>
+							</el-select>
+	            		</div>
+		            	
+		            	<el-divider></el-divider>
+		            	
+		            	<div style="margin: 10px;">
+	            			<div th:text="#{* 양식 파일 첫줄 해더 이름 기준으로 데이타 업로드 됩니다. 수정 하시면 업로드 안되거나 오류 발생 할 수 있습니다.}"></div>
+	            		</div>
+		            	<el-button :size="size" th:text="#{업로드 양식 다운로드}" @click="downExcel" icon="el-icon-download" style="margin-left: 10px;"></el-button>
+		            	
+		            	<el-divider></el-divider>
+				        
+				        <div style="margin: 10px;">
+	            			<div th:text="#{* 카테고리명은 이미 등록된 카테고리명을 입력 하시면 자동 매칭 됩니다. 등록된 카테고리명이 없거나 기타 문제로 매칭 안될경우 첫 순번의 카테고리로 설정 됩니다.
+	            				등록된 카테고리 정보가 하나도 없을 경우 메뉴 등록 않됩니다. 콤마로 여러개의 카테고리를 구분 할 수 있습니다.}"></div>
+	            			<div th:text="#{* 옵션명은 이미 등록된 옵션명을 입력 하시면 자동 매칭 됩니다. 등록된 옵션명이 없거나 기타 문제로 매칭 안될경우 설정 되지 않습니다.
+	            				콤마로 여러개의 옵션명을 구분 할 수 있습니다.}"></div>
+	            			<div th:text="#{* 메뉴 데이터 업로드를 추가적으로 할 경우, 추가할 메뉴만 양식에 적어 업로드하여야 데이터 중복 등록이 되지 않습니다.}"></div>
+	            			<div th:text="#{* 업로드된 메뉴는 사용 불가능 상태로 설정 됩니다. 메뉴 설정 완료 후 사용 가능 상태로 설정 하여 주십시오.}"></div>
+	            		</div>
+	            		
+<!--					       		 style="display: inline; margin-left: 10px;" :on-success="upSuccess" :on-error="upError">-->
+				        <el-upload :show-file-list="false" :action="getUpDataUrl" accept="application/vnd.ms-excel"
+					       		style="display: inline; margin-left: 10px;" :on-success="upSuccess" :on-error="upError">
+					  		<el-button :size="size" th:text="#{메뉴 데이타 업로드}" icon="el-icon-upload"></el-button>
+						</el-upload>
+						
+						<el-divider></el-divider>
+						
+						<div style="margin: 10px;">
+	            			<div th:text="#{* 이미지 파일명을 메뉴명과 동일 하게 설정 하고 업로드 하시면 해당 메뉴 이미지를 업데이트 하게 됩니다.}"></div>
+	            			<div th:text="#{* 이미지 사이즈는 200x150필셀을 규격을 준수 하여주십시오.}"></div>
+	            			<div th:text="#{* 이미지 파일를 압축 한다음 압축파일을 업로드 하십시오.}"></div>
+	            		</div>
+	            		
+<!--			            		style="display: inline; margin-left: 10px;" :on-success="upSuccess" :on-error="upError">-->
+						<el-upload :show-file-list="false" :action="getUpImgUrl" accept="application/x-zip-compressed"
+			            		style="display: inline; margin-left: 10px;" :on-success="upSuccess" :on-error="upError">
+			  				<el-button :size="size" th:text="#{메뉴 이미지 업로드}" icon="el-icon-upload"></el-button>
+						</el-upload>
+	            	</div>
+	            	
+	            	<el-button slot="reference" :size="size" th:text="#{메뉴 업로드}" icon="el-icon-upload"></el-button>
+				</el-popover>
+			</template>
+            
+		</div>
+		
+		<!-- 리스트 -->
+		<el-table :height="tableHeight" border stripe highlight-current-row tooltip-effect="dark"
+				ref="table" :data="tableData" :size="size" th:empty-text="#{데이타 없음}"
+				@row-click="handleRowClick" @select="handleRowChecked" @select-all="handleRowChecked">
+			<el-table-column :label="tableData.length" type="index" 	width="55" align="center" sortable label-class-name="data_cnt"></el-table-column>
+			<el-table-column type="selection" 							width="45" align="center"></el-table-column>
+			
+			<el-table-column th:label="#{이미지}" prop="smenuImg" width="62" v-if="showImg">
+				<template slot-scope="scope">
+					<el-image style="width: 40px; height: 30px;" :src="scope.row.smenuImg" fit="fill"></el-image>
+				</template>
+			</el-table-column>
+			
+			<el-table-column th:label="#{메뉴명}" 	prop="smenuNmLan" 	min-width="200" sortable show-overflow-tooltip>
+				<template slot-scope="scope">
+					<el-button type="text" @click="clickUp(scope.row)"><i class="el-icon-edit-outline"></i>&nbsp;{{ scope.row.smenuNmLan }}</el-button>
+				</template>
+			</el-table-column>
+			<el-table-column th:label="#{표시 순서}" 	prop="ord" 			min-width="115" align="center" sortable>
+				<template slot-scope="scope">
+					<el-input-number v-model="scope.row.ord" @change="handleChangeOrd(scope.row)" :min="1" :max="99" size="mini" style="width: 90px;"></el-input-number>
+				</template>
+			</el-table-column>
+			<el-table-column th:label="#{카테고리명}" 	prop="categorysNm" 	min-width="200" sortable show-overflow-tooltip></el-table-column>
+			<el-table-column th:label="#{메뉴 재료}" 	prop="stuffsNm" 	min-width="200" sortable show-overflow-tooltip></el-table-column>
+			<el-table-column th:label="#{메뉴 옵션}" 	prop="smenuOptsNm" 	min-width="200" sortable show-overflow-tooltip></el-table-column>
+			<el-table-column th:label="#{메뉴 할인}" 	prop="discountsNm" 	min-width="200" sortable show-overflow-tooltip></el-table-column>
+			<el-table-column th:label="#{원가}" 		prop="cost" 		min-width="100" align="right" sortable :formatter="mainVue.formatterPrice"></el-table-column>
+			<el-table-column th:label="#{단가}" 		prop="priceLan" 	min-width="100" align="right" sortable :formatter="mainVue.formatterPrice"></el-table-column>
+			<el-table-column th:label="#{사용 가능 여부}" prop="useYn" 		min-width="110" align="center" :formatter="mainVue.formatterCode"></el-table-column>
+			<el-table-column th:label="#{판매 정지}" 	prop="stopSelling" 	min-width="100" align="center" sortable>
+				<template slot-scope="scope">{{ scope.row.stopSelling ? 'O' : '' }}</template>
+			</el-table-column>
+			<el-table-column th:label="#{판매 정지 사유}"	prop="stopReasonNm"	min-width="200" sortable show-overflow-tooltip></el-table-column>
+			<el-table-column th:label="#{설명}" 		prop="smenuDesc" 	min-width="200" show-overflow-tooltip></el-table-column>
+		</el-table>
+		
+		<!-- 입력 팝업 -->
+		<el-dialog :title="inputForm.title" :visible.sync="dialogFormVisible" width="800px">
+			<el-form :model="inputForm" label-width="120px" label-suffix=":" :size="size" @submit.native.prevent>
+				<el-tabs v-model="activiTabSmenu">
+					<el-tab-pane th:label="#{기본 정보}" name="info">
+						<el-row :gutter="20">
+							<el-col :span="inputForm.smenuInfos.length > 0 ? 16 : 24">
+								<el-row :gutter="20">
+									<el-col :span="12">
+										<el-form-item th:label="#{메뉴 이미지}" :error="formError['smenuImgFile']" required>
+											<el-upload class="avatar-uploader" accept="image/*" :show-file-list="false" :auto-upload="false" :on-change="smenuImgChange">
+												<img v-if="inputForm.smenuImg || inputForm.smenuImgFile" :src="inputForm.smenuImgFile" class="avatar"/>
+												<i v-else class="el-icon-plus avatar-uploader-icon"></i>
+											</el-upload>
+										</el-form-item>
+									</el-col>
+									
+									<el-col :span="12">
+										<el-form-item th:label="#{매장}" required>
+											<el-select v-model="inputForm.store.storeCd" @change="storeInputSelect" v-if="'I' === inputForm.statu">
+												<el-option v-for="item in store" :key="item.storeCd" :label="item.storeNmLan" :value="item.storeCd"></el-option>
+											</el-select>
+											<span v-else class="show_cd">{{ inputForm.store.storeNmLan }}</span>
+										</el-form-item>
+										
+										<el-form-item th:label="#{메뉴명}" :error="formError.smenuNm" required>
+											<el-input v-model="inputForm.smenuNm" maxlength="50" clearable="true" show-word-limit>
+												<el-button v-if="lans.length > 1" slot="append" :size="size" th:text="#{다국어 조회}" @click="dictionaryDialogFormVisible = true" icon="el-icon-search"></el-button>
+											</el-input>
+											
+											<!-- 사전 선택 -->
+											<el-dialog th:title="#{다국어 사전}" :visible.sync="dictionaryDialogFormVisible" width="900px" append-to-body>
+												<div class="search_form" style="margin-bottom: 10px;">
+													<el-form :inline="true" label-width="60px" label-suffix=":" :size="size" @submit.native.prevent>
+														<el-form-item th:label="#{언어}">
+															<el-input v-model="searchText" @keyup.enter.native="searchDictionary" clearable="true" style="width: 190%;">
+																<el-button slot="append" :size="size" th:text="#{검색}" @click="searchDictionary" icon="el-icon-search"></el-button>
+															</el-input>
+														</el-form-item>
+													</el-form>
+												</div>
+									
+												<el-table :height="tableHeight/2" border stripe highlight-current-row tooltip-effect="dark"
+														:data="popTableData" :size="size" th:empty-text="#{언어 코드}">
+									      
+													<el-table-column fixed>
+														<template slot-scope="scope">
+															<el-button :size="size" th:text="#{선택}" @click="selectDictionary(scope.row)"></el-button>
+														</template>
+													</el-table-column>
+									
+													<el-table-column th:label="#{언어 코드}" prop="id" min-width="200" sortable show-overflow-tooltip></el-table-column>
+													<el-table-column v-for="item in lans" :label="item.nm" :prop="item.id" min-width="200" sortable show-overflow-tooltip></el-table-column>
+												</el-table>
+									
+											</el-dialog>
+										</el-form-item>
+										
+										<el-form-item th:label="#{원가}" :error="formError.cost" required>
+											<el-input-number v-model="inputForm.cost" step="100" :min="0" :max="90000000" style="width: 200px;"></el-input-number>
+										</el-form-item>
+										
+										<el-form-item th:label="#{단가}" :error="formError.price" required>
+											<el-input-number v-model="inputForm.price" step="100" :min="0" :max="90000000" style="width: 200px;"></el-input-number>
+										</el-form-item>
+										
+										<el-form-item th:label="#{표시 순서}" :error="formError.ord" required>
+											<el-input-number v-model="inputForm.ord" :min="1" :max="99"></el-input-number>
+										</el-form-item>
+									</el-col>
+								</el-row>
+								
+								<el-row :gutter="20">
+									<el-col :span="12">
+										<el-form-item th:label="#{메뉴 옵션}">
+											<opt-combo :data="smenuOpt" th:label="#{전체}" :model="inputForm.smenuOpts" @change="inputForm.smenuOpts = $event"></opt-combo>
+										</el-form-item>
+										
+										<el-form-item th:label="#{할인 설정}" :error="formError.discounts">
+											<discount-combo :data="discount" th:label="#{전체}" :model="inputForm.discounts" @change="inputForm.discounts = $event"></discount-combo>
+										</el-form-item>
+									</el-col>
+									<el-col :span="12">
+										<el-form-item th:label="#{카테고리}" :error="formError.categorys" required>
+											<category-combo :data="category" :model="inputForm.categorys" @change="inputForm.categorys = $event"></category-combo>
+										</el-form-item>
+										
+										<el-form-item th:label="#{칼로리}" :error="formError.calorie">
+											<el-input-number v-model="inputForm.calorie" :step="10" :min="0" :max="999999"></el-input-number>
+										</el-form-item>
+									</el-col>
+								</el-row>
+								
+								<el-row :gutter="20">
+									<el-col :span="12">
+										<el-form-item th:label="#{판매 정지 여부}">
+											<el-switch v-model="inputForm.stopSelling"></el-switch>
+										</el-form-item>
+									</el-col>
+									<el-col :span="12">
+										<el-form-item th:label="#{사용 가능 여부}" required>
+											<combo :data="mainVue.code.useYn" :model="inputForm.useYn" @change="inputForm.useYn = $event"></combo>
+										</el-form-item>
+									</el-col>
+									
+									<el-col :span="12">
+										<el-form-item th:label="#{판매 정지 사유}">
+											<code-combo :data="stopReason" :model="inputForm.stopReason"
+												@change="inputForm.stopReason = $event" :disabled="!inputForm.stopSelling"></code-combo>
+										</el-form-item>
+									</el-col>
+									<el-col :span="12">
+										<el-form-item th:label="#{기타 사유}" :error="formError.otherReason">
+											<el-input v-model="inputForm.otherReason" maxlength="50" clearable="true" show-word-limit
+												:disabled="!inputForm.stopSelling || null == inputForm.stopReason || 'other' != inputForm.stopReason.val"></el-input>
+										</el-form-item>
+									</el-col>
+								</el-row>
+								
+								<el-form-item th:label="#{설명}" :error="formError.smenuDesc">
+									<el-input v-model="inputForm.smenuDesc" type="textarea" maxlength="250" show-word-limit></el-input>
+								</el-form-item>
+								
+							</el-col>
+								
+							<el-col :span="8" v-if="inputForm.smenuInfos.length > 0">
+								<el-tabs v-model="activiTab">
+									<el-tab-pane v-for="(item, index) in inputForm.smenuInfos" :key="item.lanTp.id" :label="item.lanTp.nm" :name="item.lanTp.id">
+										<el-form-item th:label="#{메뉴명}" :error="formError['smenuInfos[' + index + '].smenuInfoNm']" required>
+											<el-input v-model="inputForm.smenuInfos[index].smenuInfoNm" maxlength="50" clearable="true" show-word-limit></el-input>
+										</el-form-item>
+										
+										<el-form-item th:label="#{단가}" :error="formError['smenuInfos[' + index + '].price']" required v-if="inputForm.store.internationalPayYn">
+											<el-input-number v-model="inputForm.smenuInfos[index].price" :min="0" :max="90000000" style="width: 200px;"></el-input-number>
+										</el-form-item>
+										
+									</el-tab-pane>
+								</el-tabs>
+							</el-col>
+						</el-row>
+					</el-tab-pane>
+							
+					<el-tab-pane th:label="#{재료 설정}" name="stuff">
+						<el-transfer :data="stuff"
+							:props="{ key: 'stuffCd', label: 'stuffNmLan' }"
+							v-model="inputForm.stuffsCds"
+							:titles="[listTitle, dataTitle]"
+    						:button-texts="[listBtn, dataBtn]">
+    						
+							<span slot-scope="{ option }">{{ option.stuffNmLan }}{{ util.isEmpty(option.stuffNation) ? '' : ('(' + option.stuffNation.nmLan + ')') }}</span>
+						</el-transfer>
+					</el-tab-pane>
+				</el-tabs>
+			</el-form>
+			<div slot="footer" class="dialog-footer">
+				<el-button th:text="#{저장}" icon="el-icon-check" :size="size" @click="save" :disabled="btn.saveDisabled"></el-button>
+				<el-button th:text="#{닫기}" icon="el-icon-close" :size="size" @click="dialogFormVisible = false"></el-button>
+			</div>
+		</el-dialog>
+	</div>
+	
+    <script type="text/javascript">
+	/*<![CDATA[*/
+		Vue.use(window['vue-cropper']);
+		
+		new Vue({
+			el: '#app',
+			data: function () {
+				var data = parent.mainVue.initData();
+				data.url = '/smenu';
+				
+				data.store = [];
+				data.category = [];
+				data.smenuOpt = [];
+				data.stuff = [];
+				data.discount = [];
+				data.stopReason = [];
+				data.activiTab = '';
+				data.activiTabSmenu = 'info';
+				
+				data.searchForm = this.initSearchForm();
+				data.inputForm = this.initInputForm();
+				data.formError = this.initFormError();
+				
+				// 다국어 사전 용
+				data.lans = [];
+				data.popTableData = [];
+				
+				data.dictionaryDialogFormVisible = false;
+				data.searchText = '';
+				
+				// 이미지 표시 여부
+				data.showImg = false;
+
+				data.listTitle = '[[#{재료 리스트}]]';
+				data.dataTitle = '[[#{재료}]]';
+				data.listBtn = '[[#{제거}]]';
+				data.dataBtn = '[[#{설정}]]';
+				
+				data.storeCd = null;
+				
+				return data;
+			},
+			created: function () {
+				this.initStore();
+				this.initStopReason();
+			},
+			mounted: function () {
+				setTimeout(function () {
+					this.$nextTick(function () {
+						this.mainVue.currVue = this;
+					}.bind(this));
+				}.bind(this), 500);
+			},
+			watch: {
+				formError: {
+					deep: true,
+					handler: function (newVal, oldVal) {
+						// 벨리데이션 메세지가 값은 있는데 Vue에서 표시 안해주는 현상 처리 하기 위함
+						setTimeout(function () {
+							var tmp = this.inputForm.smenuNm;
+							this.inputForm.smenuNm = this.inputForm.smenuNm + ' ';
+							this.inputForm.smenuNm = tmp;
+							
+							var i = 100;
+							for (val in newVal) {
+								if (val.indexOf('smenuInfos') > -1) {
+									if ('' != newVal[val]) {
+										if (i > val.replace(/[^0-9]*/g,"")) {
+											i = parseInt(val.replace(/[^0-9]*/g,""));
+										}
+									}
+								}
+							}
+							
+							if (100 != i) {
+								this.activiTab = this.inputForm.smenuInfos[i].lanTp.id;	
+							}
+						}.bind(this), 500);
+					}
+				},
+				'inputForm.stopSelling': function (newVal) {
+					if (!newVal) {
+						this.inputForm.stopReason = null;
+						this.inputForm.otherReason = '';
+					} else {
+						if (null == this.inputForm.stopReason || null == this.inputForm.stopReason.cd) {
+							this.inputForm.stopReason = this.stopReason.length > 0 ? util.copyObj(this.stopReason[0]) : null;	
+						}
+					}
+				},
+				'inputForm.stopReason.val': function (newVal) {
+					if ('other' != newVal) {
+						this.inputForm.otherReason = '';
+					}
+				},
+				showImg: function () {
+					this.$nextTick(function() {
+						this.$refs.table.doLayout();
+					});
+				}
+			},
+			computed: {
+				getUpDataUrl: function () {
+					return '/smenu/up/' + this.storeCd;
+				},
+				getUpImgUrl: function () {
+					return '/smenu/upImg/' + this.storeCd;
+				}
+			},
+			methods: {
+				// 검색 조건 초기화
+				initSearchForm: function () {
+					return {
+						storeCd: null,
+						categoryCd: null,
+						smenuNm: '',
+						useYn: 'Y'
+					}
+				},
+				// 입력폼 초기화
+				initInputForm: function () {
+					return {
+						statu: "I",
+						title: '',
+						smenuCd: 0,
+						defaultLan: { id: '' },
+						smenuNm: '',
+						cost: 0,
+						price: 0,
+						smenuInfos: [],
+						store: { storeCd: null, internationalPayYn: false },
+						categorys: [],
+						smenuOpts: [],
+						stuffs: [],
+						stuffsCds: [],
+						discounts: [],
+						ord: 0,
+						useYn: 'Y',
+						smenuImg: '',
+						smenuImgFile: '',
+						smenuDesc: '',
+						calorie: 0,
+						stopSelling: false,
+						stopReason: null,
+						otherReason: ''
+					}
+				},
+				// 오류 메세지 초기화
+				initFormError: function () {
+					return {
+						smenuNm: '',
+						cost: '',
+						price: '',
+						ord: '',
+						useYn: '',
+						smenuImgFile: '',
+						categorys: '',
+						smenuDesc: '',
+						otherReason: ''
+					}
+				},
+				// 그리드 선택 이벤트
+				handleRowClick: function (val) {
+					if (null != val) {
+						this.btn.upDisabled = false;
+					}
+					this.selectData = val;
+				},
+				// 체크 박스 체크 이벤트
+				handleRowChecked: function (selection, row) {
+					if (selection.length > 0) {
+						this.btn.delDisabled = false;	
+					} else {
+						this.btn.delDisabled = true;
+					}
+					
+					this.checkedData = [];
+					
+					for (var i = 0, len = selection.length; i < len; i++) {
+						this.checkedData[this.checkedData.length] = selection[i].smenuCd;
+					}
+				},
+				// 매장 자동 검색
+				initStore: function () {
+					this.mainVue.$axios.search('/store', { storeNm: "", useYn: "Y" }, function (result) {
+						this.store = result;
+						
+						if (this.store.length > 0) {
+							this.searchForm.storeCd	= this.store[0].storeCd;
+							this.inputForm.store.storeCd = this.store[0].storeCd;
+							this.inputForm.store.internationalPayYn = this.store[0].internationalPayYn;
+							this.inputForm.defaultLan = this.store[0].defaultLan;
+							
+							this.initStoreLans(this.store[0]);
+						}
+						
+						this.search();
+						this.initCategory(this.store[0].storeCd);
+						this.initSmenuOpt(this.store[0].storeCd);
+						this.initStuff(this.store[0].storeCd);
+						this.initDiscount(this.store[0].storeCd);
+						
+						
+						this.storeCd = this.store[0].storeCd;
+					}.bind(this));
+				},
+				// 사전 조회를 위한 언어 정보 설정
+				initStoreLans: function (store) {
+					this.lans = [];
+					this.lans.push(store.defaultLan);
+					
+					for (var i = 0, len = store.lans.length; i < len; i++) {
+						this.lans.push(store.lans[i]);
+					}
+				},
+				// 입력폼 매장 선택 이벤트
+				storeInputSelect: function (storeCd) {
+					this.initCategory(storeCd);
+					this.initSmenuOpt(storeCd);
+					this.initStuff(storeCd);
+					this.initDiscount(storeCd);
+					
+					for (var i = 0, len = this.store.length; i < len; i++) {
+						if (storeCd == this.store[i].storeCd) {
+							// 국제 화페 단위 결제 여부
+							this.inputForm.store.internationalPayYn = this.store[i].internationalPayYn;
+							
+							this.inputForm.defaultLan = this.store[i].defaultLan;
+							this.initStoreLans(this.store[i]);
+							
+							// 수정 시 매장 다국어 삭제 시 카테고리도 다국어 지워줌
+							var smenuInfosTmp = [];
+							
+							if (this.inputForm.statu == "U") {
+								smenuInfosTmp = util.copyObj(this.inputForm.smenuInfos);	
+							}
+							
+							this.inputForm.smenuInfos = [];
+							
+							for (var j = 0, jlen = this.store[i].lans.length; j < jlen; j++) {
+								this.formError['smenuInfos[' + j + '].smenuInfoNm'] = '';
+								this.formError['smenuInfos[' + j + '].price'] = '';
+								
+								var smenuInfoNm = '';
+								var price = 0;
+								
+								if (this.inputForm.statu == "U") {
+									for (var k = 0, klen = smenuInfosTmp.length; k < klen; k++) {
+										if (smenuInfosTmp[k].lanTp.id == this.store[i].lans[j].id) {
+											smenuInfoNm = smenuInfosTmp[k].smenuInfoNm;
+											price = smenuInfosTmp[k].price;
+										}
+									}
+								}
+								
+		 						this.inputForm.smenuInfos.push({
+		 							lanTp: this.store[i].lans[j],
+		 							smenuInfoNm: smenuInfoNm,
+		 							price: price
+		 						});
+								
+		 						if (j === 0) {
+		 							this.activiTab = this.store[i].lans[j].id;
+		 						}
+		 					}
+							break;
+						}
+					}
+				},
+				// 카테고리 데이타 조회
+				initCategory: function (storeCd) {
+					this.mainVue.$axios.search("/category", { storeCd: storeCd, categoryNm: '', useYn: '' }, function (result) {
+						this.category = result;
+					}.bind(this));
+				},
+				// 옵션 데이타 조회
+				initSmenuOpt: function (storeCd) {
+					this.mainVue.$axios.search("/smenuOpt", { storeCd: storeCd, smenuOptNm: '', useYn: '' }, function (result) {
+						this.smenuOpt = result;
+					}.bind(this));
+				},
+				// 재료 데이타 조회
+				initStuff: function (storeCd) {
+					this.mainVue.$axios.search("/stuff", { storeCd: storeCd, stuffNm: '', useYn: '' }, function (result) {
+						this.stuff = result;
+					}.bind(this));
+				},
+				// 할인 데이타 조회
+				initDiscount: function (storeCd) {
+					this.mainVue.$axios.search("/discount/forMenu", { storeCd: storeCd }, function (result) {
+						this.discount = result;
+					}.bind(this));
+				},
+				// 판매 정지 사유
+				initStopReason: function () {
+					this.mainVue.$axios.search("/code/getCode/STOP_REASON", null, function (result) {
+						this.stopReason = result;
+					}.bind(this));
+				},
+				// 추가
+				add: function () {
+					this.activiTabSmenu = 'info';
+					this.inputForm = this.initInputForm();
+					this.inputForm.title = '[[#{메뉴 추가}]]';
+					this.formError = this.initFormError();
+					
+					if (this.store.length > 0) {
+						this.inputForm.store = { storeCd: util.copyObj(this.searchForm.storeCd) };
+						this.storeInputSelect(this.inputForm.store.storeCd);
+					}
+					
+					// 순번 자동으로 검색된 내용중 제일 마지막으로 설정
+					for (var i = 0, len = this.tableData.length; i < len; i++) {
+						if (this.inputForm.ord < this.tableData[i].ord) {
+							this.inputForm.ord = this.tableData[i].ord;
+						}
+					}
+					
+					this.inputForm.ord++;
+					
+					this.dialogFormVisible = true;
+					this.btn.saveDisabled = false;
+				},
+				// 메뉴 클릭해서 수정
+				clickUp: function (row) {
+					this.handleRowClick(row);
+					this.up();
+				},
+				// 수정
+				up: function () {
+					this.mainVue.$axios.get(this.url + '/' + this.selectData.smenuCd, function (result) {
+						this.activiTabSmenu = 'info';
+						result.statu = "U";
+						result.title = "[[#{메뉴 수정}]]";
+						result.smenuImgFile = result.smenuImg;
+						
+						// 재료 설정
+						result.stuffsCds = [];
+						for (var i = 0, len = result.stuffs.length; i < len; i++) {
+							result.stuffsCds.push(result.stuffs[i].stuffCd);
+						}
+						
+						this.inputForm = result;
+						
+						this.formError = this.initFormError();
+						
+						this.stuff = []; // 체크상태 초기화 하기 위해서 재설정, 아래 함수에서 다시 설정 해줌
+						this.storeInputSelect(this.inputForm.store.storeCd);
+						
+						this.dialogFormVisible = true;
+						this.btn.saveDisabled = false;
+					}.bind(this));
+				},
+				// 조회
+				search: function () {
+					this.mainVue.$axios.search(this.url, this.searchForm, function (result) {
+						this.tableData = result;
+						
+						this.btn.addDisabled = false;
+						this.btn.upDisabled = true;
+						this.btn.delDisabled = true;
+						
+						this.formError = this.initFormError();
+					}.bind(this));
+				},
+				// 삭제
+				del: function () {
+					this.mainVue.$confirm("[[#{{0}를 삭제 하시겠습니까?(#{메뉴 정보})}]]", this.mainVue.appMsg.systemAlterTitle, {
+				          confirmButtonText: "[[#{삭제}]]",
+				          cancelButtonText: "[[#{취소}]]",
+				          type: 'info'
+				        }).then(function () {
+				        	this.mainVue.$axios.del(this.url + "/del/" + this.checkedData.join(","), function (result) {
+				        		this.mainVue.$message({ type: 'success', message: "[[#{삭제 성공}]]" });
+				        		this.search();
+							}.bind(this));
+				        }.bind(this)).catch(function () {
+				        	this.mainVue.$message({ type: 'info', message: "[[#{삭제 취소}]]" });
+				        }.bind(this));
+				},
+				// 반영
+				use: function () {
+					this.mainVue.$confirm("[[#{{0}를 사용으로 설정 하시겠습니까?(#{메뉴 정보})}]]", this.mainVue.appMsg.systemAlterTitle, {
+				          confirmButtonText: "[[#{사용}]]",
+				          cancelButtonText: "[[#{취소}]]",
+				          type: 'info'
+				        }).then(function () {
+				        	this.mainVue.$axios.up(this.url + "/use/" + this.checkedData.join(","), null, null, function (result) {
+				        		this.mainVue.$message({ type: 'success', message: "[[#{사용 설정 성공}]]" });
+				        		this.searchForm.useYn = 'Y';
+				        		this.search();
+							}.bind(this));
+				        }.bind(this)).catch(function () {
+				        	this.mainVue.$message({ type: 'info', message: "[[#{사용 취소}]]" });
+				        }.bind(this));
+				},
+				// 저장
+				save: function () {
+					this.formError = this.initFormError();
+					
+					// 재료 설정
+					this.inputForm.stuffs = [];
+					for (var i = 0, len = this.inputForm.stuffsCds.length; i < len; i++) {
+						for (var j = 0, jlen = this.stuff.length; j < jlen; j++) {
+							if (this.inputForm.stuffsCds[i] == this.stuff[j].stuffCd) {
+								this.inputForm.stuffs.push(this.stuff[j]);
+								break;
+							}
+						}
+					}
+					
+					for (var i = 0, len = this.inputForm.smenuInfos.length; i < len; i++) {
+						this.formError['smenuInfos[' + i + '].smenuInfoNm'] = '';
+						this.formError['smenuInfos[' + i + '].price'] = '';
+					}
+					
+					if ('I' === this.inputForm.statu) {
+						this.mainVue.$axios.add(this.url, this.inputForm, this.formError, function (result) {
+							this.mainVue.$message({ type: 'success', message: "[[#{등록 성공}]]" });
+							this.dialogFormVisible = false;
+							this.search();
+						}.bind(this));
+					} else {
+						this.mainVue.$axios.up(this.url + "/modi/" + this.inputForm.smenuCd, this.inputForm, this.formError, function (result) {
+							this.mainVue.$message({ type: 'success', message: "[[#{수정 성공}]]" });
+							this.dialogFormVisible = false;
+							this.search();
+						}.bind(this));
+					}
+				},
+				// 이미지 선택
+				smenuImgChange: function (file) {
+					util.imgToBase64(URL.createObjectURL(file.raw), file.raw.type, function (data, img) {
+							this.inputForm.smenuImgFile = data;	
+					}.bind(this));
+				},
+				searchDictionary: function (searchText) {
+					this.mainVue.$axios.search("/dictionary/search", { nm: this.searchText, dictionaryTpVal: "menu" }, function (result) {
+						this.popTableData = [];
+						
+						for (var i = 0, len = result.length; i < len; i++) {
+							var tmp = result[i];
+							
+							tmp[result[i].lan.id] = result[i].nm;
+							
+							for (var j = 0, jlen = result[i].dictionarys.length; j < jlen; j++) {
+								tmp[result[i].dictionarys[j].lan.id] = result[i].dictionarys[j].nm;
+							}
+							
+							this.popTableData.push(tmp);
+						}
+					}.bind(this));
+				},
+				// 키워드 데이타 선택
+				selectDictionary: function (row) {
+					for (var i = 0, len = this.lans.length; i < len; i++) {
+						// 기본 언어 새팅
+						if (0 == i) {
+							this.inputForm.smenuNm = row[this.lans[i].id];
+						} else {
+							// 타언어 순서대로 등록
+							this.inputForm.smenuInfos[i-1].smenuInfoNm = row[this.lans[i].id];
+						}
+					}
+					
+					this.dictionaryDialogFormVisible = false;
+				},
+				// 양식 다운로드
+				downExcel: function () {
+					location.href = this.url + '/down/' + this.storeCd;
+				},
+				upSuccess: function () {
+					this.mainVue.$message({ type: 'success', message: "[[#{업로드 되었습니다}]]" });
+					this.searchForm.useYn = 'N';
+					this.search();
+				},
+				upError: function () {
+					this.mainVue.$message({ type: 'error', message: "[[#{업로드 실패 하였습니다}]]" });
+				},
+				// 순서 수정
+				handleChangeOrd: function (row) {
+					this.mainVue.$axios.patchNonLoading(this.url + "/" + row.smenuCd + "/" + row.ord);
+				}
+				
+		    }
+		});
+	/*]]>*/
+	</script>
+</body>
+</html>

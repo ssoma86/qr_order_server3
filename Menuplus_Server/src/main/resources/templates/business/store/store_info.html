@@ -1,0 +1,1399 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:include="main/import :: head"></head>
+<body>
+	<script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
+	<script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=0e6fda714755f30eefef88056fbd7582&libraries=services,clusterer,drawing"></script>
+
+	<style type="text/css">
+		.el-upload-list__item {
+			-webkit-transition: none;
+			transition: none;
+		}
+		
+		.file_name .el-textarea__inner {
+			height: 90px;
+		}
+		.el-dialog__header{display:none;}
+		.search_form{display:none;}
+	</style>
+	
+	<div id="app" class="contain">
+		<!-- 검색 영역 -->
+		<div class="search_form" ref="search_form"></div>
+		
+		<!-- 버튼 -->
+		<div class="buttons" ref="buttons" style="display:none;"></div>
+		
+		<!-- 입력 팝업 -->
+			<div style="margin-bottom: 20px;" th:text="#{* 언어 변경후 카테고리, 재료, 옵션 그룹, 옵션, 할인, 메뉴 데이타도 같이 수정 해주셔야 합니다.}"></div>
+			
+			<!-- <el-popover placement="right" trigger="click" :show="showQr(inputForm.storeId)" style="float: right; margin-top: -35px;">
+				<el-row style="text-align: center; width: 500px;">
+					<el-col :span="12">
+						<div th:text="#{매장 정보 QR}"></div>
+						<div :id="'storeId_' + inputForm.storeId" style="padding: 20px;"></div>
+						<div>{{ getStoreInfoQr(inputForm.storeId) }}</div>
+					</el-col>
+					<el-col :span="12">
+						<div th:text="#{매장 배달  QR}"></div>
+						<div :id="'storeId_O_' + inputForm.storeId" style="padding: 20px;"></div>
+						<div>{{ getOutQr(inputForm.storeId) }}</div>
+					</el-col>
+				</el-row>
+				<el-button :size="size" slot="reference" th:text="#{QR보기}"></el-button>
+			</el-popover> -->
+		
+			<el-form :model="inputForm" label-width="100px" label-suffix=":" :size="size" @submit.native.prevent>
+				<el-tabs v-model="activiTabStore">
+					<el-tab-pane th:label="#{매장 정보 설정}" name="info">
+						<el-row>
+							<el-col :span="inputForm.lans.length > 0 ? 16 : 24">
+								<el-row>
+									<el-col :span="12">
+										<el-form-item th:label="#{매장명}" :error="formError.storeNm" required>
+											<el-input v-model="inputForm.storeNm" maxlength="50" clearable="true" show-word-limit></el-input>
+										</el-form-item>
+									</el-col>
+									<el-col :span="12">
+										<el-form-item th:label="#{디폴트 언어}" :error="formError['defaultLan.id']" required>
+											<lan-combo :data="lans" :model="inputForm.defaultLan.id" @change="defaultLanChange"></lan-combo>
+										</el-form-item>
+									</el-col>
+									<el-col :span="12">
+										<el-form-item th:label="#{전화번호}" :error="formError.tel" required>
+											<el-input v-model="inputForm.tel" maxlength="20" clearable="true" show-word-limit @keyup.native="inputForm.tel = util.inputTelNew($event)"></el-input>
+										</el-form-item>
+									</el-col>
+									<el-col :span="12">
+										<el-form-item th:label="#{대표자명}" :error="formError.ceoNm" required>
+											<el-input v-model="inputForm.ceoNm" maxlength="20" clearable="true" show-word-limit></el-input>
+										</el-form-item>
+									</el-col>
+									<!-- <el-col :span="12">
+										<el-form-item th:label="#{언어 추가}">
+											<lans-combo :data="lans" :model="inputForm.lans" :disable_id="inputForm.defaultLan.id" @change="lansChange"></lans-combo>
+										</el-form-item>
+									</el-col> -->
+									<!-- <el-col :span="24">
+										<el-form-item th:label="#{매장 유형}" :error="formError.storeTps">
+											<mcombo :data="mainVue.code.storeTp" :model="inputForm.storeTps" @change="inputForm.storeTps = $event"></mcombo>
+										</el-form-item>
+									</el-col> -->
+									<!--결제구분 삭제-->
+<!--									<el-col :span="12">-->
+<!--										<el-form-item th:label="#{결제 구분}" :error="formError.payTps" required>-->
+<!--											<mcode-combo :data="payTp" :model="inputForm.payTps" @change="inputForm.payTps = $event"></mcode-combo>-->
+<!--										</el-form-item>-->
+<!--									</el-col>-->
+									<!--TODO# 판매 방식 추가-->
+									<!-- <el-col :span="12">
+										<el-form-item th:label="#{판매 방식}" :error="formError.webSalesTps" required>
+											<mcode-combo :data="webSalesTp" :model="inputForm.webSalesTps" @change="inputForm.webSalesTps = $event"></mcode-combo>
+										</el-form-item>
+									</el-col>
+									<el-col :span="12">
+										<el-form-item th:label="#{필터 옵션 구분}">
+											<mcode-combo :data="filterTp" :model="inputForm.filterTps" @change="inputForm.filterTps = $event"></mcode-combo>
+										</el-form-item>
+									</el-col> -->
+<!--                                    <el-col :span="6">-->
+<!--                                        <el-form-item th:label="#{배달비용}" :error="formError.deliveryCost">-->
+<!--                                            <el-input-number v-model="inputForm.deliveryCost" step="100" :min="0" :max="100000" style="width: 200px;"></el-input-number>-->
+<!--                                        </el-form-item>-->
+<!--                                    </el-col>-->
+									<!-- <el-col :span="12">
+										<el-form-item th:label="#{배달지 검색}">
+											<el-input placeholder="시,군,구를 입력하세요." v-model="inputForm.city">
+												<el-button slot="append" icon="el-icon-search" @click="searchAddr"></el-button>
+											</el-input>
+										</el-form-item>
+									</el-col> -->
+									<el-col v-for="(velue, index) in 6" v-if="eval('delivery' + index) != ''" :span="24">
+										<delivery-tag :spen="12"
+													  :cost="getCost(index)"
+													  :data="eval('delivery' + index)"
+													  :model="eval('delivery' + index)"
+													  @change="eval('delivery' + index) = $event" ></delivery-tag>
+										<delivery-memo :spen="12"
+													   :data="'this.inputForm.deliveryMemo'.concat(index)"
+													   @change="insMemo"
+													   :model="eval('inputForm.deliveryMemo' + index)"></delivery-memo>
+									</el-col>
+									<el-col :span="24">
+										<el-form-item th:label="#{매장 주소}" :error="formError.storeAddr" required>
+											<el-input v-model="inputForm.storeAddr" maxlength="250" show-word-limit readonly>
+												<el-button slot="append" th:text="#{주소 조회}" @click="initDaum('store')"></el-button>
+											</el-input>
+										</el-form-item>
+									</el-col>
+									<el-col :span="24">
+										<el-form-item th:label="#{상세 주소}"  required>
+											<el-input v-model="inputForm.storeAddrDtl" maxlength="50" clearable="true" show-word-limit></el-input>
+										</el-form-item>
+									</el-col>
+									<!-- 
+									<el-col :span="5">
+										<el-form-item th:label="#{최소금액}" :error="formError.minCost" required>
+											<el-input v-model="inputForm.minCost" maxlength="20" clearable="true" show-word-limit></el-input>
+										</el-form-item>
+									</el-col>
+									
+									<el-col :span="12">
+										<el-form-item th:label="#{GPS 경도}" :error="formError.gpsLng" required>
+											<el-input v-model="inputForm.gpsLng" style="width: 180px;" readonly></el-input>
+										</el-form-item>
+									</el-col>
+									<el-col :span="12">
+										<el-form-item th:label="#{GPS 위도}" :error="formError.gpsLat" required>
+											<el-input v-model="inputForm.gpsLat" style="width: 180px;" readonly></el-input>
+										</el-form-item>
+									</el-col>
+									-->
+									<el-col :span="24">
+										<el-form-item th:label="#{운영안내}" :error="formError.storeDesc">
+											<el-input v-model="inputForm.storeDesc" type="textarea" maxlength="250" show-word-limit></el-input>
+										</el-form-item>
+									</el-col>
+								</el-row>
+								
+								<!-- <el-row>
+									<el-col :span="12">
+										<el-form-item th:label="#{주문 통지}">
+											<el-switch v-model="inputForm.orderNoti"></el-switch>
+										</el-form-item>
+									</el-col>
+									<el-col :span="12">
+										<el-form-item th:label="#{주방 프린터 연동}">
+											<el-switch v-model="inputForm.printYn"></el-switch>
+										</el-form-item>
+									</el-col>
+									<el-col :span="12">
+										<el-form-item th:label="#{국제 결제 사용}">
+											<el-switch v-model="inputForm.internationalPayYn"></el-switch>
+										</el-form-item>
+									</el-col>
+									<el-col :span="12">
+										<el-form-item th:label="#{픽업 가능 시간}">
+											<el-input-number v-model="inputForm.pickUpTime" :min="0" :max="30"></el-input-number>
+											&nbsp;&nbsp;<span th:text="#{분}"></span>
+											<div th:text="#{0분으로 설정 시 주문리스트에 표시 하지 않습니다.}"></div>
+										</el-form-item>
+									</el-col>
+								</el-row> -->
+							</el-col>
+							
+							
+						</el-row>
+						
+						<el-row>
+							<el-col :span="24">
+								<el-form-item th:label="#{대표 이미지}" :error="formError['storeImgFile']" required>
+									<el-upload class="avatar-uploader" accept="image/*" :show-file-list="false" :auto-upload="false" :on-change="imgChange">
+										<img v-if="inputForm.storeImg || inputForm.storeImgFile" :src="inputForm.storeImgFile" class="avatar"/>
+										<i v-else class="el-icon-plus avatar-uploader-icon"></i>
+									</el-upload>
+								</el-form-item>
+							</el-col>
+							
+							
+							<!-- el-col :span="24">
+								<el-form-item th:label="#{매장 이미지}">
+									<div style="float: left; margin-right: 5px;">
+										<el-upload class="avatar-uploader" accept="image/*" :show-file-list="false" :auto-upload="false" :on-change="imgChange1">
+											<img v-if="inputForm.storeImg1 || inputForm.storeImgFile1" :src="inputForm.storeImgFile1" class="avatar"/>
+											<i v-else class="el-icon-plus avatar-uploader-icon"></i>
+										</el-upload>
+									</div>
+									
+									<div style="float: left; margin-right: 5px;">
+										<el-upload class="avatar-uploader" accept="image/*" :show-file-list="false" :auto-upload="false" :on-change="imgChange2">
+											<img v-if="inputForm.storeImg2 || inputForm.storeImgFile2" :src="inputForm.storeImgFile2" class="avatar"/>
+											<i v-else class="el-icon-plus avatar-uploader-icon"></i>
+										</el-upload>
+									</div>
+									
+									<div style="float: left; margin-right: 5px;">
+										<el-upload class="avatar-uploader" accept="image/*" :show-file-list="false" :auto-upload="false" :on-change="imgChange3">
+											<img v-if="inputForm.storeImg3 || inputForm.storeImgFile3" :src="inputForm.storeImgFile3" class="avatar"/>
+											<i v-else class="el-icon-plus avatar-uploader-icon"></i>
+										</el-upload>
+									</div>
+									
+									<div style="float: left; margin-right: 5px;">
+										<el-upload class="avatar-uploader" accept="image/*" :show-file-list="false" :auto-upload="false" :on-change="imgChange4">
+											<img v-if="inputForm.storeImg4 || inputForm.storeImgFile4" :src="inputForm.storeImgFile4" class="avatar"/>
+											<i v-else class="el-icon-plus avatar-uploader-icon"></i>
+										</el-upload>
+									</div>
+									
+									<div style="float: left;">
+										<el-upload class="avatar-uploader" accept="image/*" :show-file-list="false" :auto-upload="false" :on-change="imgChange5">
+											<img v-if="inputForm.storeImg5 || inputForm.storeImgFile5" :src="inputForm.storeImgFile5" class="avatar"/>
+											<i v-else class="el-icon-plus avatar-uploader-icon"></i>
+										</el-upload>
+									</div>
+								</el-form-item>
+							</el-col-->
+						</el-row>
+						<el-row>
+							<el-col :span="8" v-if="inputForm.lans.length > 0">
+								<el-tabs v-model="activiTab">
+									<el-tab-pane v-for="(item, index) in inputForm.storeInfos" :key="item.lanTp.id" :label="item.lanTp.nm" :name="item.lanTp.id">
+										<el-form-item th:label="#{매장명}" label-width="120px" :error="formError['storeInfos[' + index + '].storeInfoNm']" required>
+											<el-input v-model="inputForm.storeInfos[index].storeInfoNm" maxlength="50" clearable="true" show-word-limit></el-input>
+										</el-form-item>
+										
+										<el-form-item th:label="#{매장 주소}" label-width="120px" :error="formError['storeInfos[' + index + '].storeInfoAddr']" required>
+											<el-input v-model="inputForm.storeInfos[index].storeInfoAddr" maxlength="250" clearable="true" show-word-limit></el-input>
+										</el-form-item>
+										
+										<el-form-item th:label="#{매장 설명}" label-width="120px" :error="formError['storeInfos[' + index + '].storeInfoDesc']" required>
+											<el-input v-model="inputForm.storeInfos[index].storeInfoDesc" maxlength="250" clearable="true" show-word-limit></el-input>
+										</el-form-item>
+									</el-tab-pane>
+								</el-tabs>
+							</el-col>
+						</el-row>
+						
+					</el-tab-pane>
+							
+					<el-tab-pane th:label="#{영업 시간 설정}" name="time">
+						<!-- <el-divider content-position="left" th:text="#{영업 시간 설정}"></el-divider> -->
+						
+						<el-row :gutter="10" style="line-height: 200%; margin-bottom: 20px;">
+							<el-col :span="4">
+								<el-radio-group v-model="inputForm.detailYn" size="small">
+									<el-radio-button :label="false" th:text="#{간편설정}"></el-radio-button>
+									<el-radio-button :label="true" th:text="#{상세설정}"></el-radio-button>
+								</el-radio-group>
+							</el-col>
+						</el-row>
+						<el-row :gutter="10" style="line-height: 200%; margin-bottom: 10px;">
+							<el-col style="text-align:center" :span="2" th:text="#{휴무 설정}" v-if="inputForm.detailYn"></el-col>
+							<el-col style="text-align:center" :span="2" th:text="#{요일}"></el-col>
+							<el-col style="text-align:center" :span="6" th:text="#{영업 시간}"></el-col>
+							<el-col style="text-align:center" :span="6" th:text="#{브레이크 타임}"></el-col>
+							<el-col style="text-align:center" :span="2" th:text="#{일괄적용}" v-if="inputForm.detailYn"></el-col>
+						</el-row>
+						
+						<div v-if="inputForm.detailYn">
+							<el-row :gutter="10" v-for="(item, index) in detailWeeks" :key="index">
+								<el-col :span="2" style="text-align: center;">
+									<el-checkbox v-model="inputForm.storeTimesDetail[index].isHoliday" size="small" @change="weekHolidayChange(index)"></el-checkbox>
+								</el-col>
+								<el-col :span="2" style="text-align: center;line-height: 28px;font-weight:bold;">{{ item.label }}</el-col>
+								<el-col :span="6" style="text-align: center;">
+									<el-form-item label-width="0" :error="formError['storeTimesDetail[' + index + '].tm']" size="mini">
+										<el-time-select th:placeholder="#{시작}" v-model="inputForm.storeTimesDetail[index].startTm" style="width: 82px" :disabled="inputForm.storeTimesDetail[index].dayYn"
+											:picker-options="{ start: '00:30', step: '00:30', end: '23:30' }" @change="batchChange(index, 'startTm')"></el-time-select>
+										<el-time-select th:placeholder="#{종료}" v-model="inputForm.storeTimesDetail[index].endTm" style="width: 82px" :disabled="inputForm.storeTimesDetail[index].dayYn"
+											:picker-options="{ start: '00:30', step: '00:30', end: '23:30', minTime: inputForm.storeTimesDetail[index].startTm }"  @change="batchChange(index, 'endTm')"></el-time-select>
+										<el-checkbox v-model="inputForm.storeTimesDetail[index].dayYn" th:label="#{24시간}" border @change="dayYnChange(index)" :disabled="inputForm.storeTimesDetail[index].isHoliday"></el-checkbox>
+									</el-form-item>
+								</el-col>
+								<el-col :span="6" style="text-align: center;">
+									<el-form-item label-width="0" :error="formError['storeTimesDetail[' + index + '].btm']" size="mini">
+										<el-time-select th:placeholder="#{시작}" v-model="inputForm.storeTimesDetail[index].breakStartTm1" style="width: 82px" :disabled="inputForm.storeTimesDetail[index].isHoliday"
+											:picker-options="{ start: '00:30', step: '00:30', end: '23:30' }"  @change="batchChange(index, 'breakStartTm1')"></el-time-select>
+										<el-time-select th:placeholder="#{종료}" v-model="inputForm.storeTimesDetail[index].breakEndTm1" style="width: 82px" :disabled="inputForm.storeTimesDetail[index].isHoliday"
+											:picker-options="{ start: '00:30', step: '00:30', end: '23:30', minTime: inputForm.storeTimesDetail[index].breakStartTm1 }"  @change="batchChange(index, 'breakEndTm1')"></el-time-select>
+										<el-time-select th:placeholder="#{시작}" v-model="inputForm.storeTimesDetail[index].breakStartTm2" style="width: 82px" :disabled="inputForm.storeTimesDetail[index].isHoliday"
+											:picker-options="{ start: '00:30', step: '00:30', end: '23:30', minTime: inputForm.storeTimesDetail[index].breakEndTm1 }"  @change="batchChange(index, 'breakStartTm2')"></el-time-select>
+										<el-time-select th:placeholder="#{종료}" v-model="inputForm.storeTimesDetail[index].breakEndTm2" style="width: 82px" :disabled="inputForm.storeTimesDetail[index].isHoliday"
+											:picker-options="{ start: '00:30', step: '00:30', end: '23:30', minTime: inputForm.storeTimesDetail[index].breakStartTm2 }"  @change="batchChange(index, 'breakEndTm2')"></el-time-select>
+									</el-form-item>
+								</el-col>
+								<el-col :span="2" style="text-align: center;">
+									<el-checkbox v-model="inputForm.storeTimesDetail[index].isBatch" size="small" :disabled="inputForm.storeTimesDetail[index].isHoliday" @change="batchChange(index)"></el-checkbox>
+								</el-col>
+							</el-row>
+						</div>
+						
+						<div v-else>
+							<el-row :gutter="10" v-for="(item, index) in simpleWeeks" :key="index">
+								<el-col :span="2" style="text-align: center;line-height: 28px;font-weight:bold;">{{ item.label }}</el-col>
+								<el-col :span="6" style="text-align: center;">
+									<el-form-item label-width="0" :error="formError['storeTimesSimple[' + index + '].tm']" size="mini">
+										<el-time-select th:placeholder="#{시작}" v-model="inputForm.storeTimesSimple[index].startTm" style="width: 82px" :disabled="inputForm.storeTimesSimple[index].dayYn"
+											:picker-options="{ start: '00:30', step: '00:30', end: '23:30', maxTime: inputForm.storeTimesSimple[index].endTm }" @change="batchChange(index, 'startTm')"></el-time-select>
+										<el-time-select th:placeholder="#{종료}" v-model="inputForm.storeTimesSimple[index].endTm" style="width: 82px" :disabled="inputForm.storeTimesSimple[index].dayYn"
+											:picker-options="{ start: '00:30', step: '00:30', end: '23:30', minTime: inputForm.storeTimesSimple[index].startTm }"  @change="batchChange(index, 'endTm')"></el-time-select>
+										<el-checkbox v-model="inputForm.storeTimesSimple[index].dayYn" th:label="#{24시간}" border @change="dayYnChange(index)"></el-checkbox>
+									</el-form-item>
+								</el-col>
+								<el-col :span="6" style="text-align: center;">
+									<el-form-item label-width="0" :error="formError['storeTimesSimple[' + index + '].btm']" size="mini">
+										<el-time-select th:placeholder="#{시작}" v-model="inputForm.storeTimesSimple[index].breakStartTm1" style="width: 82px"
+											:picker-options="{ start: '00:30', step: '00:30', end: '23:30', maxTime: inputForm.storeTimesSimple[index].breakEndTm1 }"  @change="batchChange(index, 'breakStartTm1')"></el-time-select>
+										<el-time-select th:placeholder="#{종료}" v-model="inputForm.storeTimesSimple[index].breakEndTm1" style="width: 82px"
+											:picker-options="{ start: '00:30', step: '00:30', end: '23:30', minTime: inputForm.storeTimesSimple[index].breakStartTm1 }"  @change="batchChange(index, 'breakEndTm1')"></el-time-select>
+										<el-time-select th:placeholder="#{시작}" v-model="inputForm.storeTimesSimple[index].breakStartTm2" style="width: 82px"
+											:picker-options="{ start: '00:30', step: '00:30', end: '23:30', maxTime: inputForm.storeTimesSimple[index].breakEndTm2 }"  @change="batchChange(index, 'breakStartTm2')"></el-time-select>
+										<el-time-select th:placeholder="#{종료}" v-model="inputForm.storeTimesSimple[index].breakEndTm2" style="width: 82px"
+											:picker-options="{ start: '00:30', step: '00:30', end: '23:30', minTime: inputForm.storeTimesSimple[index].breakStartTm2 }"  @change="batchChange(index, 'breakEndTm2')"></el-time-select>
+									</el-form-item>
+								</el-col>
+							</el-row>
+						</div>
+						
+						<!-- 
+						<el-divider content-position="left" th:text="#{정기 휴무 설정}"></el-divider>
+						
+						<el-row :gutter="10" style="line-height: 200%; margin-bottom: 10px;">
+							<el-col :span="5" style="text-align: center;">
+								<el-radio-group v-model="inputForm.tp" size="mini">
+									<el-radio-button label="week" th:text="#{요일별 설정}"></el-radio-button>
+									<el-radio-button label="day" th:text="#{일자별 설정}"></el-radio-button>
+								</el-radio-group>
+							</el-col>
+							<template v-if="'week' == inputForm.tp">
+								<el-col :span="5" style="text-align: center;">
+									<el-radio-group v-model="inputForm.weekTp" size="mini">
+										<el-radio-button label="ew" th:text="#{매주}"></el-radio-button>
+										<el-radio-button label="bw" th:text="#{격주}"></el-radio-button>
+									</el-radio-group>
+								</el-col>
+								<el-col :span="6">
+									<el-form-item label-width="0">
+										<mcombo :data="detailWeeks" :model="inputForm.weeks" @change="inputForm.weeks = $event"></mcombo>
+									</el-form-item>
+								</el-col>
+								<el-col :span="8" v-if="'bw' == inputForm.weekTp">
+									<el-form-item label-width="0">
+										<el-switch v-model="inputForm.sniffling"
+											th:inactive-text="#{이번주부터 휴무}" active-color="#ff4949"
+											th:active-text="#{다음주부터 휴무}" inactive-color="#13ce66"></el-switch>
+									</el-form-item>
+								</el-col>
+							</template>
+							
+							<template v-else>
+								<el-col :span="10">
+									<el-form-item label-width="0">
+										<el-select v-model="inputForm.holidayDays" multiple th:placeholder="#{일자 선택}" style="width: 100%;">
+											<el-option v-for="item in 28" :key="item" :label="item" :value="item"></el-option>
+										</el-select>
+									</el-form-item>
+								</el-col>
+							</template>
+						</el-row>
+						-->
+						
+						
+						<el-divider content-position="left" th:text="#{기타 휴무 설정}"></el-divider>
+						
+						<el-row>
+							<el-col :span="20">
+								<el-form-item th:label="#{휴일}" label-width="50px">
+									<el-date-picker v-model="inputForm.vactionDays" type="dates"
+										th:placeholder="#{일자 선택}" style="width: 100%;"></el-date-picker>
+								</el-form-item>
+							</el-col>
+						</el-row>
+					</el-tab-pane>
+				</el-tabs>
+			</el-form>
+			
+			<div style="margin-top:20px">
+				<el-button th:text="#{저장}" @click="save" icon="el-icon-check" :size="size" :disabled="btn.saveDisabled" type="primary"></el-button>
+			</div>
+			<el-dialog title="검색결과"  :visible.sync="addrDialogFormVisible" class="inner_popup" append-to-body>
+				<el-checkbox-group v-model="checkedLabel" class="addr_list">
+					<el-checkbox v-for="addr in addressList"
+								 :label="addr.addressBub + '(' + addr.addressHeng + ')'"
+								 @change="setAddress(addr)"
+								 :disabled="handleDisabled(addr)"
+								 border>
+					</el-checkbox>
+				</el-checkbox-group>
+				<span slot="footer" class="dialog-footer">
+					<el-select v-model="selectedCost" placeholder="Select">
+						<el-option
+								v-for="item in costOptions"
+								:key="item.value"
+								:label="item.label"
+								:value="item.value">
+						</el-option>
+					</el-select>
+					<el-button @click="addrDialogFormVisible = false">닫기</el-button>
+					<el-button type="primary" @click="addDelivery()">배달비 추가</el-button>
+				</span>
+			</el-dialog>
+	</div>
+	<script>
+		//TODO# LiveLeload 기능
+		Vue.config.devtools = true;
+	</script>
+    <script type="text/javascript">
+	/*<![CDATA[*/
+		new Vue({
+			el: '#app',
+			data: function () {
+				var data = parent.mainVue.initData();
+				data.url = '/store/info';
+				data.lans = [];
+				data.activiTab = '';
+				data.activiTabStore = 'info';
+				data.imgList = [];
+				data.showImgSelect = true;
+				data.storeTp = [];
+				data.payTp = [];
+				data.filterTp = [];
+				data.webSalesTp = [];
+				data.appSalesTp = [];
+				data.bankTp = [];
+                data.addrDialogFormVisible = false;
+				
+				data.simpleWeeks = [
+					{ label: '[[#{평일}]]' },
+					{ label: '[[#{주말}]]' }
+				];
+				
+				data.detailWeeks = [
+					{ label: '[[#{월요일}]]', value: 1 },
+					{ label: '[[#{화요일}]]', value: 2 },
+					{ label: '[[#{수요일}]]', value: 3 },
+					{ label: '[[#{목요일}]]', value: 4 },
+					{ label: '[[#{금요일}]]', value: 5 },
+					{ label: '[[#{토요일}]]', value: 6 },
+					{ label: '[[#{일요일}]]', value: 7 }
+				];
+                data.costOptions = [{
+					value: '0',
+					label: '무료'
+				}, {
+                    value: '1000',
+                    label: '1000원'
+                }, {
+                    value: '2000',
+                    label: '2000원'
+                }, {
+                    value: '3000',
+                    label: '3000원'
+                }, {
+                    value: '4000',
+                    label: '4000원'
+                }, {
+                    value: '5000',
+                    label: '5000원'
+                }];
+				data.blank = [];
+				data.selectedCost = '';
+				data.addressList = [];
+				data.checkedLabel = [];
+				data.checkedAddr = [];
+				data.delivery0 = [];
+				data.delivery1 = [];
+				data.delivery2 = [];
+				data.delivery3 = [];
+				data.delivery4 = [];
+				data.delivery5 = [];
+				data.deliveryMemo0 = '';
+				data.deliveryMemo1 = '';
+				data.deliveryMemo2 = '';
+				data.deliveryMemo3 = '';
+				data.deliveryMemo4 = '';
+				data.deliveryMemo5 = '';
+				
+				
+				data.inputForm = this.initInputForm();
+				data.formError = this.initFormError();
+				
+				data.dialogFormVisible = true;
+				data.btn.saveDisabled = false;
+				
+				return data;
+			},
+			created: function () {
+				this.initLan();
+				this.initPayTp();
+				this.initFilterTp();
+				this.initSalesTp();
+				this.initBankTp();
+				this.up();
+			},
+			mounted: function () {
+				setTimeout(function () {
+					this.$nextTick(function () {
+						this.mainVue.currVue = this;
+					}.bind(this));
+				}.bind(this), 500);
+			},
+			watch: {
+				formError: {
+					deep: true,
+					handler: function (newVal, oldVal) {
+						// 벨리데이션 메세지가 값은 있는데 Vue에서 표시 안해주는 현상 처리 하기 위함
+						setTimeout(function () {
+							var tmp = this.inputForm.storeNm;
+							this.inputForm.storeNm = this.inputForm.storeNm + ' ';
+							this.inputForm.storeNm = tmp;
+							
+							var i = 100;
+							var infoError = 0;
+							var custError = 0;
+							
+							for (val in newVal) {
+								if (val.indexOf('storeInfos') > -1) {
+									if ('' != newVal[val]) {
+										if (i > val.replace(/[^0-9]*/g,"")) {
+											i = parseInt(val.replace(/[^0-9]*/g,""));
+										}
+									}
+								}
+								
+								for (var j = 0, jlen = this.formError.custErrors.length; j < jlen; j++) {
+									if (val.indexOf(this.formError.custErrors[j]) > -1) {
+										if ('' != newVal[val]) {
+											custError++;
+										}
+									}
+								}
+								
+								for (var j = 0, jlen = this.formError.infoErrors.length; j < jlen; j++) {
+									if (val.indexOf(this.formError.infoErrors[j]) > -1) {
+										if ('' != newVal[val]) {
+											infoError++;
+										}
+									}
+								}
+							}
+							
+							if (infoError > 0) {
+								this.activiTabStore = 'info';
+							} else if (custError > 0) {
+								this.activiTabStore = 'cust';
+							}
+							
+							if (100 != i) {
+								this.activiTab = this.inputForm.storeInfos[i].lanTp.id;	
+							}
+						}.bind(this), 500);
+					}
+				}
+			},
+			methods: {
+				// 입력폼 초기화
+				initInputForm: function () {
+					return {
+						statu: 'U',
+						title: '[[#{매장 수정}]]',
+						storeCd: 0,
+						storeNm: '',
+						storeId: '',
+						defaultLan: { id: '' },
+						lans: [],
+						detailYn: false,
+						storeInfos: [{ storeInfoNm: '', storeInfoAddr: '', storeInfoDesc: '', lanTp: { id: '', nm: '' } }],
+						storeTimes: [],
+						storeTimesSimple: this.initStoreTimes(false),
+						storeTimesDetail: this.initStoreTimes(true),
+						storeTps: [],
+						payTps: [],
+						filterTps: [],
+						// deliveryCost: 0,
+						webSalesTps: [],
+						minCost:0,
+						appSalesTps: [],
+						useYn: 'Y',
+						storeImg: '',
+						storeImgFile: '',
+						// busiNum: '',
+						ceoNm: '',
+						tel: '',
+						// fax: '',
+						// zipCd: '',
+						// addr: '',
+						// addrDtl: '',
+						storeDesc: '',
+						// files: [],
+						// delFiles: [],
+						orderNoti: true,
+						notiTime: 0,
+						printYn: false,
+						internationalPayYn: false,
+						gpsLng: 0.0,
+						gpsLat: 0.0,
+						// accountNumber: '',
+						// bankTp: null,
+						// accountName: '',
+						tp: 'week',
+						weekTp: 'bw',
+						weeks: [],
+						sniffling: false,
+						holidayDays: [],
+						vactionDays: [],
+						storeImg1: '',
+						storeImgFile1: '',
+						storeImg2: '',
+						storeImgFile2: '',
+						storeImg3: '',
+						storeImgFile3: '',
+						storeImg4: '',
+						storeImgFile4: '',
+						storeImg5: '',
+						storeImgFile5: '',
+						pickUpTime: 0,
+                        city: '',
+					}
+				},
+				initStoreTimes: function (detailYn) {
+					var tmp = [];
+					
+					var len = detailYn ? 8 : 3
+					
+					for (var i = 1; i < len; i++) {
+						tmp.push({
+							week: i,
+							dayYn: false,
+							startTm: null,
+							endTm: null,
+							breakStartTm1: null,
+							breakEndTm1: null,
+							breakStartTm2: null,
+							breakEndTm2: null,
+							isHoliday: false,
+							isBatch: detailYn ? i < 6 ? true : false : false
+						});
+					}
+					
+					return tmp;
+				},
+				// 오류 메세지 초기화
+				initFormError: function () {
+					return {
+						storeNm: '',
+						storeAddr: '',
+						storeAddrDtl: '',
+						minCost:0,
+						'defaultLan.id': '',
+						storeTps: '',
+						payTps: '',
+						// deliveryCost: '',
+						webSalesTps: '',
+						appSalesTps: '',
+						// useYn: '',
+						storeImgFile: '',
+						// busiNum: '',
+						ceoNm: '',
+						tel: '',
+						// fax: '',
+						// zipCd: '',
+						// addr: '',
+						// addrDtl: '',
+						storeDesc: '',
+						infoErrors: ['storeNm', 'storeAddr', 'storeAddrDtl', 'defaultLan.id', 'payTps', 'webSalesTps', 'appSalesTps', 'tel', 'gpsLng', 'gpsLat', 'storeDesc', 'storeImgFile'],
+						custErrors: ['useYn', 'busiNum', 'ceoNm', 'fax', 'zipCd', 'addr', 'addrDtl', 'accountNumber', 'bankTp.cd', 'accountName'],
+						gpsLng: '',
+						gpsLat: '',
+						// accountNumber: '',
+						'bankTp.cd': '',
+						// accountName: ''
+					}
+				},
+				// 언어 데이타 조회
+				initLan: function () {
+					this.mainVue.$axios.search("/language", null, function (result) {
+						this.lans = result;
+					}.bind(this), false);
+				},
+				// 결제 구분 데이타 초기화
+				initPayTp: function () {
+					this.mainVue.$axios.search("/code/getCode/PAY_TP", null, function (result) {
+						this.payTp = result;
+					}.bind(this), false);
+				},
+				// 필터 옵션 구분 데이타 초기화
+				initFilterTp: function () {
+					this.mainVue.$axios.search("/code/getCode/FILTER_TP", null, function (result) {
+						this.filterTp = result;
+					}.bind(this));
+				},
+				// 판매 방식 데이타 초기화
+				initSalesTp: function () {
+					this.mainVue.$axios.search("/code/getCode/SALES_TP", null, function (result) {
+						for (var i = 0, len = result.length; i < len; i++) {
+							this.webSalesTp.push(result[i]);
+							this.appSalesTp.push(result[i]);
+						}
+					}.bind(this), false);
+				},
+				// 정산은행구분 조회
+				initBankTp: function () {
+					this.mainVue.$axios.search('/code/getCode/BANK_TP', null, function (result) {
+						this.bankTp = result;
+					}.bind(this));
+				},
+				// 디폴트 언어 이벤트
+				defaultLanChange: function (e) {
+					this.inputForm.defaultLan.id = e;
+					
+					// 디폴트 언어 선택 하였으면 지우기
+					for (var i = 0, len = this.inputForm.lans.length; i < len; i++) {
+						if (this.inputForm.defaultLan.id == this.inputForm.lans[i].id) {
+							this.inputForm.lans.splice(i, 1);
+							this.lansChange(this.inputForm.lans);
+							break;
+						}
+					}
+				},
+				lansChange: function (e) {
+					this.inputForm.lans = e;
+					
+					var tmpStoreInfos = this.inputForm.storeInfos;
+					
+					this.inputForm.storeInfos = [];
+					
+					// 없는거 추가
+					for (var i = 0, len = e.length; i < len; i++) {
+						var isExist = false;
+						
+						for (var j = 0, jlen = tmpStoreInfos.length; j < jlen; j++) {
+							if (e[i].id == tmpStoreInfos[j].lanTp.id) {
+								isExist = true;
+								
+								this.formError['storeInfos[' + this.inputForm.storeInfos.length + '].storeInfoNm'] = '';
+								this.formError['storeInfos[' + this.inputForm.storeInfos.length + '].storeInfoAddr'] = '';
+								this.formError['storeInfos[' + this.inputForm.storeInfos.length + '].storeInfoDesc'] = '';
+								
+								this.inputForm.storeInfos.push(tmpStoreInfos[j]);
+								
+								this.activiTab = tmpStoreInfos[j].lanTp.id;
+								continue;
+							}
+						}
+						
+						if (!isExist) {
+							this.formError['storeInfos[' + this.inputForm.storeInfos.length + '].storeInfoNm'] = '';
+							this.formError['storeInfos[' + this.inputForm.storeInfos.length + '].storeInfoAddr'] = '';
+							this.formError['storeInfos[' + this.inputForm.storeInfos.length + '].storeInfoDesc'] = '';
+							
+							this.inputForm.storeInfos.push({
+								lanTp: e[i],
+								storeInfoNm: '',
+								storeInfoAddr: '',
+								storeInfoDesc: ''
+							});
+							
+							this.activiTab = e[i].id;
+						}
+					}
+				},
+				// 수정
+				up: function () {
+					this.mainVue.$axios.search(this.url, null, function (result) {
+						result.storeImgFile = result.storeImg;
+						result.storeImgFile1 = result.storeImg1;
+						result.storeImgFile2 = result.storeImg2;
+						result.storeImgFile3 = result.storeImg3;
+						result.storeImgFile4 = result.storeImg4;
+						result.storeImgFile5 = result.storeImg5;
+						
+						result.delFiles = [];
+						
+						if (result.lans.length > 0) {
+							this.activiTab = result.lans[0].id;	
+						}
+						
+						this.formError = this.initFormError();
+						
+						// 시간 설정 오류 필드 설정
+						result.storeTimesSimple = this.initStoreTimes(false);
+						result.storeTimesDetail = this.initStoreTimes(true);
+						
+						
+						for (var i = 0, len = result.storeTimesDetail.length; i < len; i++) {
+							this.formError['storeTimesDetail[' + i + '].tm'] = '';
+							this.formError['storeTimesDetail[' + i + '].btm'] = '';
+							
+							result.storeTimesDetail[i].isBatch = false;
+						}
+						
+						for (var i = 0, len = result.storeTimesSimple.length; i < len; i++) {
+							this.formError['storeTimesSimple[' + i + '].tm'] = '';
+							this.formError['storeTimesSimple[' + i + '].btm'] = '';
+							
+							result.storeTimesSimple[i].isBatch = false;
+						}
+						
+						if (result.detailYn) {
+							result.storeTimesDetail = result.storeTimes;
+						} else {
+							result.storeTimesSimple = result.storeTimes;
+						}
+
+						//1.배달지역 2.특이사항
+						for(let i = 0 ; i <=5 ; i++){
+							eval("this.delivery" + i + " = result.delivery" + i + ";");
+							eval("this.inputForm.deliveryMemo" + i + " = '';");
+						}
+
+						this.inputForm = result;
+						this.inputForm.delivery = [];
+					}.bind(this), false);
+				},
+				// 저장
+				save: function () {
+					this.formError = this.initFormError();
+					
+					var isValid = false;
+					
+					if (this.inputForm.detailYn) {
+						for (var i = 0, len = this.inputForm.storeTimesDetail.length; i < len; i++) {
+							var tmp = this.inputForm.storeTimesDetail[i];
+							
+							if (!tmp.isHoliday) {
+								if (!tmp.dayYn) {
+									if (util.isEmpty(tmp.startTm) || util.isEmpty(tmp.endTm)) {
+										this.formError['storeTimesDetail[' + i + '].tm'] = '[[#{영업 시간을 설정 하여 주십시오.}]]';
+										isValid = true;
+									}
+								}
+								
+								if (
+										(!util.isEmpty(tmp.breakStartTm1) && util.isEmpty(tmp.breakEndTm1)) ||
+										(!util.isEmpty(tmp.breakEndTm1) && util.isEmpty(tmp.breakStartTm1)) ||
+										(!util.isEmpty(tmp.breakStartTm2) && util.isEmpty(tmp.breakEndTm2)) ||
+										(!util.isEmpty(tmp.breakEndTm2) && util.isEmpty(tmp.breakStartTm2))
+								) {
+									this.formError['storeTimesDetail[' + i + '].btm'] = '[[#{BreakTime을 설정 하여 주십시오.}]]';
+									isValid = true;
+								}
+							}
+						}
+					} else {
+						for (var i = 0, len = this.inputForm.storeTimesSimple.length; i < len; i++) {
+							var tmp = this.inputForm.storeTimesSimple[i];
+							
+							if (!tmp.isHoliday) {
+								if (!tmp.dayYn) {
+									if (util.isEmpty(tmp.startTm) || util.isEmpty(tmp.endTm)) {
+										this.formError['storeTimesSimple[' + i + '].tm'] = '[[#{영업 시간을 설정 하여 주십시오.}]]';
+										isValid = true;
+									}
+								}
+								
+								if (
+										(!util.isEmpty(tmp.breakStartTm1) && util.isEmpty(tmp.breakEndTm1)) ||
+										(!util.isEmpty(tmp.breakEndTm1) && util.isEmpty(tmp.breakStartTm1)) ||
+										(!util.isEmpty(tmp.breakStartTm2) && util.isEmpty(tmp.breakEndTm2)) ||
+										(!util.isEmpty(tmp.breakEndTm2) && util.isEmpty(tmp.breakStartTm2))
+								) {
+									this.formError['storeTimesSimple[' + i + '].btm'] = '[[#{BreakTime을 설정 하여 주십시오.}]]';
+									isValid = true;
+								}
+							}
+						}
+					}
+					
+					
+					if (isValid) {
+						this.activiTabStore = 'time';
+						return;
+					}
+					
+					if (this.inputForm.detailYn) {
+						this.inputForm.storeTimes = this.inputForm.storeTimesDetail;
+					} else {
+						this.inputForm.storeTimes = this.inputForm.storeTimesSimple;
+					}
+					
+					for (var i = 0, len = this.inputForm.storeInfos.length; i < len; i++) {
+						this.formError['storeInfos[' + i + '].storeInfoNm'] = '';
+						this.formError['storeInfos[' + i + '].storeInfoAddr'] = '';
+						this.formError['storeInfos[' + i + '].storeInfoDesc'] = '';
+					}
+					
+					// this.inputForm.files = this.inputForm.files.concat(this.inputForm.delFiles);
+
+					//배달비 ,배달지 저장
+					const storeCd = this.inputForm.storeCd;
+					this.inputForm.delivery = [];
+					let temp = Array;
+					let deliveryNum = Array;
+					function setCost(cnt){
+						return cnt === 0 ? '0' : Number(eval(cnt + '000'));
+					}
+
+					for(let cnt = 0;cnt <= 5; cnt++){
+						deliveryNum = eval('this.delivery' + cnt);
+						if(deliveryNum !== null) {
+							for (const d of deliveryNum) {
+								temp = {
+									useYn: "Y",
+									addressCd: d.addressCd,
+									deliveryCost: setCost(cnt),
+									storeCd: storeCd
+								};
+								this.inputForm.delivery.push(temp);
+							}
+						}
+					}
+					
+					
+					//기타 휴일 날짜 yyyy-mm-dd로 재설정(2023.08.04)
+					if(this.inputForm.vactionDays!=null && this.inputForm.vactionDays.length > 0){
+						
+						tempArray = [];
+						
+						for(i =0 ; i < this.inputForm.vactionDays.length ; i++ ){
+							//console.log("======vactionDays[" + i+ "] type :" + Object.prototype.toString.call(this.inputForm.vactionDays[i]));
+							
+							if(this.inputForm.vactionDays[i] instanceof Date){
+								var year = this.inputForm.vactionDays[i].getFullYear();
+								var month = ('0' + (this.inputForm.vactionDays[i].getMonth() + 1)).slice(-2);
+								var day = ('0' + this.inputForm.vactionDays[i].getDate()).slice(-2);
+								
+								temp = year + '-' + month + '-' + day;
+								tempArray.push(temp);
+							}
+							
+						}
+						
+						if(tempArray.length > 0){
+							//tempArray에 담긴 날짜를  정렬한다.
+							tempArray.sort(function (a,b){
+								
+								temp1 =	a.replace(/-/gi,""); // ex.) 23-08-07 --> 230807
+								temp2 = b.replace(/-/gi,"");
+								
+								if(temp1 > temp2 ){
+									return 1;
+								}
+								
+								if(temp2 > temp1 ){
+									return -1;
+								}
+								
+								return 0;
+								
+							});
+							
+							console.log("================tempArray:" + tempArray);						
+							this.inputForm.vactionDays = tempArray;
+						}
+						
+					}
+					
+					this.inputForm.orderNoti = true; //주문통지는 true로 고정 시킴(23.09.25)
+					
+					this.mainVue.$axios.add(this.url + "/updateSelfStore/" + this.inputForm.storeCd, this.inputForm, this.formError, function (result) {
+						this.mainVue.$message({ type: 'success', message: "[[#{수정 성공}]]" });
+						this.activiTabStore = 'info';
+						
+						// 주문 통지 사용 시 소켓 열어줌
+						if (this.inputForm.orderNoti) {
+							this.mainVue.initWebSocket();
+						} else {
+							this.mainVue.websock.close();
+						}
+					}.bind(this), true);
+				},
+				
+				
+				beforeUpload: function(){
+					console.log(111111);
+				},
+				
+				// 메인 이미지 선택
+				imgChange: function (file) {
+					util.imgToBase64(URL.createObjectURL(file.raw), file.raw.type, function (data, img) {
+						this.inputForm.storeImgFile = data;	
+					}.bind(this));
+				},
+				// 이미지 선택
+				imgChange1: function (file) {
+					util.imgToBase64(URL.createObjectURL(file.raw), file.raw.type, function (data, img) {
+							this.inputForm.storeImgFile1 = data;	
+					}.bind(this));
+				},
+				imgChange2: function (file) {
+					util.imgToBase64(URL.createObjectURL(file.raw), file.raw.type, function (data, img) {
+							this.inputForm.storeImgFile2 = data;	
+					}.bind(this));
+				},
+				imgChange3: function (file) {
+					util.imgToBase64(URL.createObjectURL(file.raw), file.raw.type, function (data, img) {
+							this.inputForm.storeImgFile3 = data;	
+					}.bind(this));
+				},
+				imgChange4: function (file) {
+					util.imgToBase64(URL.createObjectURL(file.raw), file.raw.type, function (data, img) {
+							this.inputForm.storeImgFile4 = data;	
+					}.bind(this));
+				},
+				imgChange5: function (file) {
+					util.imgToBase64(URL.createObjectURL(file.raw), file.raw.type, function (data, img) {
+							this.inputForm.storeImgFile5 = data;	
+					}.bind(this));
+				},
+				// // 첨부 파일 추가
+				// storeFileAdd: function (file, fileList) {
+				// 	util.imgToBase64(URL.createObjectURL(file.raw), file.raw.type, function (data) {
+				// 		this.inputForm.files.push({
+				// 			url: data,
+				// 			name: file.name,
+				// 			status: "ready"
+				// 		});
+				// 	}.bind(this));
+				// },
+				// // 수정 시 업로드 했던 이미지 삭제 시 삭제 리스트에 저장
+				// storeFileRemove: function (file, fileList) {
+				// 	var tmp = -1;
+				// 	for (var i = 0, len = this.inputForm.files.length; i < len; i++) {
+				// 		if (this.inputForm.files[i].url == file.url) {
+				// 			tmp = i;
+				// 		}
+				// 	}
+				//	
+				// 	if (tmp > -1) {
+				// 		this.inputForm.files.splice(tmp, 1);	
+				// 	}
+				//	
+				// 	if (file.status == "success") {
+				// 		file.status = "del";
+				// 		this.inputForm.delFiles.push(file);
+				// 	}
+				// },
+				// fileNameChange: function (file) {
+				// 	if ("ready" != file.status) {
+				// 		file.status = 'change';	
+				// 	}
+				// },
+				// 24시간 선택
+				dayYnChange: function (index) {
+					if (this.inputForm.detailYn) {
+						if (this.inputForm.storeTimesDetail[index].isBatch) {
+							for (var i = 0, len = this.inputForm.storeTimesDetail.length; i < len; i++) {
+								if (this.inputForm.storeTimesDetail[i].isBatch) {
+									this.inputForm.storeTimesDetail[i].startTm = null;
+									this.inputForm.storeTimesDetail[i].endTm = null;
+									this.inputForm.storeTimesDetail[i].dayYn = this.inputForm.storeTimesDetail[index].dayYn;
+								}
+							}
+						} else {
+							this.inputForm.storeTimesDetail[index].startTm = null;
+							this.inputForm.storeTimesDetail[index].endTm = null;
+						}	
+					} else {
+						if (this.inputForm.storeTimesSimple[index].isBatch) {
+							for (var i = 0, len = this.inputForm.storeTimesSimple.length; i < len; i++) {
+								if (this.inputForm.storeTimesSimple[i].isBatch) {
+									this.inputForm.storeTimesSimple[i].startTm = null;
+									this.inputForm.storeTimesSimple[i].endTm = null;
+									this.inputForm.storeTimesSimple[i].dayYn = this.inputForm.storeTimesSimple[index].dayYn;
+								}
+							}
+						} else {
+							this.inputForm.storeTimesSimple[index].startTm = null;
+							this.inputForm.storeTimesSimple[index].endTm = null;
+						}
+					}
+				},
+				// 휴무 선택
+				holidayChange: function (index) {
+					if (this.inputForm.detailYn) {
+						this.inputForm.storeTimesDetail[index].dayYn = false;
+						this.inputForm.storeTimesDetail[index].startTm = null;
+						this.inputForm.storeTimesDetail[index].endTm = null;
+						this.inputForm.storeTimesDetail[index].breakStartTm1 = null;
+						this.inputForm.storeTimesDetail[index].breakEndTm1 = null;
+						this.inputForm.storeTimesDetail[index].breakStartTm2 = null;
+						this.inputForm.storeTimesDetail[index].breakEndTm2 = null;
+						this.inputForm.storeTimesDetail[index].isBatch = false;
+					} else {
+						this.inputForm.storeTimesSimple[index].dayYn = false;
+						this.inputForm.storeTimesSimple[index].startTm = null;
+						this.inputForm.storeTimesSimple[index].endTm = null;
+						this.inputForm.storeTimesSimple[index].breakStartTm1 = null;
+						this.inputForm.storeTimesSimple[index].breakEndTm1 = null;
+						this.inputForm.storeTimesSimple[index].breakStartTm2 = null;
+						this.inputForm.storeTimesSimple[index].breakEndTm2 = null;
+						this.inputForm.storeTimesSimple[index].isBatch = false;
+					}
+				},
+				
+				
+				//요일 휴무 여부
+				weekHolidayChange: function(index){
+					if (this.inputForm.detailYn) {
+						if(this.inputForm.storeTimesDetail[index].isHoliday){
+							
+							console.log(1111);
+							
+							this.inputForm.storeTimesDetail[index].isHoliday = true;
+							this.inputForm.storeTimesDetail[index].startTm = null;
+							this.inputForm.storeTimesDetail[index].endTm = null;
+							this.inputForm.storeTimesDetail[index].breakStartTm1 = null;
+							this.inputForm.storeTimesDetail[index].breakEndTm1 = null;
+							this.inputForm.storeTimesDetail[index].breakStartTm2 = null;
+							this.inputForm.storeTimesDetail[index].breakEndTm2 = null;
+							this.inputForm.storeTimesDetail[index].isBatch = false;
+						}else{
+							console.log(2222);
+							this.inputForm.storeTimesDetail[index].isHoliday = false;
+						}
+					}
+				},
+				
+				
+				// 일괄 적용
+				batchChange: function (index, column) {
+					if (this.inputForm.detailYn) {
+						if ('breakStartTm1' == column &&
+							util.isEmpty(this.inputForm.storeTimesDetail[index].breakEndTm1) &&
+							!util.isEmpty(this.inputForm.storeTimesDetail[index].breakStartTm1)) {
+							this.inputForm.storeTimesDetail[index].breakEndTm1 = this.inputForm.storeTimesDetail[index].breakStartTm1;
+						}
+						
+						if ('breakEndTm1' == column &&
+							util.isEmpty(this.inputForm.storeTimesDetail[index].breakStartTm1) &&
+							!util.isEmpty(this.inputForm.storeTimesDetail[index].breakEndTm1)) {
+							this.inputForm.storeTimesDetail[index].breakStartTm1 = this.inputForm.storeTimesDetail[index].breakEndTm1;
+						}
+						
+						if ('breakStartTm2' == column &&
+							util.isEmpty(this.inputForm.storeTimesDetail[index].breakEndTm2) &&
+							!util.isEmpty(this.inputForm.storeTimesDetail[index].breakStartTm2)) {
+							this.inputForm.storeTimesDetail[index].breakEndTm2 = this.inputForm.storeTimesDetail[index].breakStartTm2;
+						}
+						
+						if ('breakEndTm2' == column &&
+							util.isEmpty(this.inputForm.storeTimesDetail[index].breakStartTm2) &&
+							!util.isEmpty(this.inputForm.storeTimesDetail[index].breakEndTm2)) {
+							this.inputForm.storeTimesDetail[index].breakStartTm2 = this.inputForm.storeTimesDetail[index].breakEndTm2;
+						}
+						
+						
+						if (this.inputForm.storeTimesDetail[index].isBatch) {
+							for (var i = 0, len = this.inputForm.storeTimesDetail.length; i < len; i++) {
+								if (this.inputForm.storeTimesDetail[i].isBatch) {
+									if (!util.isEmpty(this.inputForm.storeTimesDetail[index][column])) {
+										this.inputForm.storeTimesDetail[i][column] = this.inputForm.storeTimesDetail[index][column] + '';
+									} else {
+										this.inputForm.storeTimesDetail[i][column] = '';
+									}
+									
+									if ('breakStartTm1' == column &&
+										util.isEmpty(this.inputForm.storeTimesDetail[i].breakEndTm1) &&
+										!util.isEmpty(this.inputForm.storeTimesDetail[i].breakStartTm1)) {
+										this.inputForm.storeTimesDetail[i].breakEndTm1 = this.inputForm.storeTimesDetail[i].breakStartTm1;
+									}
+									
+									if ('breakEndTm1' == column &&
+										util.isEmpty(this.inputForm.storeTimesDetail[i].breakStartTm1) &&
+										!util.isEmpty(this.inputForm.storeTimesDetail[i].breakEndTm1)) {
+										this.inputForm.storeTimesDetail[i].breakStartTm1 = this.inputForm.storeTimesDetail[i].breakEndTm1;
+									}
+									
+									if ('breakStartTm2' == column &&
+										util.isEmpty(this.inputForm.storeTimesDetail[i].breakEndTm2) &&
+										!util.isEmpty(this.inputForm.storeTimesDetail[i].breakStartTm2)) {
+										this.inputForm.storeTimesDetail[i].breakEndTm2 = this.inputForm.storeTimesDetail[i].breakStartTm2;
+									}
+									
+									if ('breakEndTm2' == column &&
+										util.isEmpty(this.inputForm.storeTimesDetail[i].breakStartTm2) &&
+										!util.isEmpty(this.inputForm.storeTimesDetail[i].breakEndTm2)) {
+										this.inputForm.storeTimesDetail[i].breakStartTm2 = this.inputForm.storeTimesDetail[i].breakEndTm2;
+									}
+								}
+							}
+						}
+					} else {
+						if ('breakStartTm1' == column &&
+							util.isEmpty(this.inputForm.storeTimesSimple[index].breakEndTm1) &&
+							!util.isEmpty(this.inputForm.storeTimesSimple[index].breakStartTm1)) {
+							this.inputForm.storeTimesSimple[index].breakEndTm1 = this.inputForm.storeTimesSimple[index].breakStartTm1;
+						}
+						
+						if ('breakEndTm1' == column &&
+							util.isEmpty(this.inputForm.storeTimesSimple[index].breakStartTm1) &&
+							!util.isEmpty(this.inputForm.storeTimesSimple[index].breakEndTm1)) {
+							this.inputForm.storeTimesSimple[index].breakStartTm1 = this.inputForm.storeTimesSimple[index].breakEndTm1;
+						}
+						
+						if ('breakStartTm2' == column &&
+							util.isEmpty(this.inputForm.storeTimesSimple[index].breakEndTm2) &&
+							!util.isEmpty(this.inputForm.storeTimesSimple[index].breakStartTm2)) {
+							this.inputForm.storeTimesSimple[index].breakEndTm2 = this.inputForm.storeTimesSimple[index].breakStartTm2;
+						}
+						
+						if ('breakEndTm2' == column &&
+							util.isEmpty(this.inputForm.storeTimesSimple[index].breakStartTm2) &&
+							!util.isEmpty(this.inputForm.storeTimesSimple[index].breakEndTm2)) {
+							this.inputForm.storeTimesSimple[index].breakStartTm2 = this.inputForm.storeTimesSimple[index].breakEndTm2;
+						}
+						
+						
+						if (this.inputForm.storeTimesSimple[index].isBatch) {
+							for (var i = 0, len = this.inputForm.storeTimesSimple.length; i < len; i++) {
+								if (this.inputForm.storeTimesSimple[i].isBatch) {
+									if (!util.isEmpty(this.inputForm.storeTimesSimple[index][column])) {
+										this.inputForm.storeTimesSimple[i][column] = this.inputForm.storeTimesSimple[index][column] + '';
+									} else {
+										this.inputForm.storeTimesSimple[i][column] = '';
+									}
+									
+									if ('breakStartTm1' == column &&
+										util.isEmpty(this.inputForm.storeTimesSimple[i].breakEndTm1) &&
+										!util.isEmpty(this.inputForm.storeTimesSimple[i].breakStartTm1)) {
+										this.inputForm.storeTimesSimple[i].breakEndTm1 = this.inputForm.storeTimesSimple[i].breakStartTm1;
+									}
+									
+									if ('breakEndTm1' == column &&
+										util.isEmpty(this.inputForm.storeTimesSimple[i].breakStartTm1) &&
+										!util.isEmpty(this.inputForm.storeTimesSimple[i].breakEndTm1)) {
+										this.inputForm.storeTimesSimple[i].breakStartTm1 = this.inputForm.storeTimesSimple[i].breakEndTm1;
+									}
+									
+									if ('breakStartTm2' == column &&
+										util.isEmpty(this.inputForm.storeTimesSimple[i].breakEndTm2) &&
+										!util.isEmpty(this.inputForm.storeTimesSimple[i].breakStartTm2)) {
+										this.inputForm.storeTimesSimple[i].breakEndTm2 = this.inputForm.storeTimesSimple[i].breakStartTm2;
+									}
+									
+									if ('breakEndTm2' == column &&
+										util.isEmpty(this.inputForm.storeTimesSimple[i].breakStartTm2) &&
+										!util.isEmpty(this.inputForm.storeTimesSimple[i].breakEndTm2)) {
+										this.inputForm.storeTimesSimple[i].breakStartTm2 = this.inputForm.storeTimesSimple[i].breakEndTm2;
+									}
+								}
+							}
+						}
+					}
+				},
+				// 매장 정보 QR
+			    getStoreInfoQr: function  (storeId) {
+			    	return 'https://menuplus.kr/qr/' + storeId;
+			    },
+			    // 매장 배달  QR
+				getOutQr: function  (storeId) {
+			    	return 'https://menuplus.kr/qr/' + storeId + '/1/O';
+			    },
+			    showQr: function  (storeId) {
+			    	if (null != document.getElementById('storeId_' + storeId)) {
+			    		var tmp = document.getElementById('storeId_' + storeId);
+			    		tmp.innerHTML = '';
+			    		tmp.appendChild(new AraleQRCode({ text:  'https://menuplus.kr/qr/' + storeId, size: 160 }));	
+			    	}
+			    	
+			    	if (null != document.getElementById('storeId_O_' + storeId)) {
+			    		var tmp = document.getElementById('storeId_O_' + storeId);
+			    		tmp.innerHTML = '';
+			    		tmp.appendChild(new AraleQRCode({ text: 'https://menuplus.kr/qr/' + storeId + '/1/O', size: 160 }));
+			    	}
+			    },
+			    initDaum: function (tp) {
+					var thiz = this;
+					
+					new daum.Postcode({
+				        oncomplete: function (data) {
+				        	if ('store' == tp) {
+				        		thiz.inputForm.storeAddr = data.address;
+					            
+					            var geocoder = new kakao.maps.services.Geocoder();
+					         	// 주소로 좌표를 검색합니다
+								geocoder.addressSearch(data.address, function(result, status) {
+								    // 정상적으로 검색이 완료됐으면 
+								    if (status === kakao.maps.services.Status.OK) {
+								    	thiz.inputForm.gpsLng = result[0].x;
+								    	thiz.inputForm.gpsLat = result[0].y;
+								    }
+								});
+				        	} else {
+				        		// thiz.inputForm.zipCd = data.zonecode;
+				        		// thiz.inputForm.addr = data.address;
+				        		
+				        		thiz.$refs.addr_dtl.focus();
+				        	}
+				        }
+				    }).open();
+				},
+				searchAddr: function () {
+					if(this.inputForm.city.trim() === ''){
+						this.mainVue.$message({ type: 'warning', message: "[[#{배달지를 입력하세요.}]]" });
+					} else if(this.inputForm.city.trim().length < 2){
+						this.mainVue.$message({ type: 'warning', message: "[[#{배달지를 2자 이상 입력하세요.}]]" });
+					} else if(this.inputForm.city.trim() != '' && this.inputForm.city.trim().length > 1) {
+						var self = this;
+						this.mainVue.$axios.get('/store/searchAddr?city=' + this.inputForm.city, function (result) {
+							if (result.length > 0) {
+								self.addressList = result;
+								this.inputForm.city = this.addressList[0].city;
+								this.addrDialogFormVisible = true;
+							} else {
+								this.mainVue.$message({type: 'warning', message: "[[#{지역명이 올바르지 않습니다.}]]"});
+							}
+						}.bind(this));
+						this.inputForm.city = '';
+					}
+				},
+                setAddress: function(data){
+                    let flg = true;
+                    let addrIndex = 0;
+                    for (const index in this.checkedAddr){
+                        if (this.checkedAddr[index].addressCd === data.addressCd){
+                            flg = false;
+                            addrIndex = index;
+                        }
+                    }
+                    if (flg) {
+                        this.checkedAddr.push(data);
+                    } else {
+                        this.checkedAddr.splice(addrIndex, 1);
+                    }
+
+				},
+				handleDisabled(data){
+					let disabled = false;
+					let temp = [];
+					for(let i = 0 ; i <=5 ; i++){
+						eval("temp = " + "this.delivery" + i + ";");
+						temp.forEach(function(addr){
+							if(addr.addressCd === data.addressCd){
+								disabled = true;
+							}
+						});
+					}
+					return disabled;
+                },
+				addDelivery() {
+					if(this.selectedCost == '') {
+						this.mainVue.$message({ type: 'warning', message: "[[#{배달비를 선택하세요.}]]" });
+					} else if(this.checkedAddr === '') {
+						this.mainVue.$message({ type: 'warning', message: "[[#{배달지역을 선택하세요.}]]" });
+					} else {
+						switch(this.selectedCost){
+							case '0' : this.addDeliveryCommon(this.selectedCost); break;
+							case '1000' : this.addDeliveryCommon(this.selectedCost); break;
+							case '2000' : this.addDeliveryCommon(this.selectedCost); break;
+							case '3000' : this.addDeliveryCommon(this.selectedCost); break;
+							case '4000' : this.addDeliveryCommon(this.selectedCost); break;
+							case '5000' : this.addDeliveryCommon(this.selectedCost); break;
+						}
+						this.inputForm.city = '';
+						this.addrDialogFormVisible = false;
+						this.mainVue.$message({ type: 'success', message: "[[#{배달비 추가 완료}]]" });
+					}
+				},
+				addDeliveryCommon(cost){
+					let i = cost.substr(0, 1);
+					eval('this.delivery' + i + ' = this.blank.slice()');
+					eval('this.delivery' + i + ' = this.checkedAddr.slice()');
+					this.checkedAddr.length = this.blank.slice();
+					this.checkedLabel.length = this.blank.slice();
+				},
+				insMemo(memoNm, memo){
+					eval(memoNm + '=' +"'"+memo+"'");
+				},
+				getCost(i){
+					return (null !== i && String(i) !== '0' ? String(i) + '000원' : '무료');
+				},
+			}
+		});
+	/*]]>*/
+	</script>
+</body>
+</html>

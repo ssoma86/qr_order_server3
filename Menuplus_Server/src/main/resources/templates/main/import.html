@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:fragment="head">
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+	<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0">
+    <meta name="description" content="MenuPlus" />
+    <meta name="author" content="lf" />
+    <link rel="shortcut icon" href="/img/favicon.ico">
+    
+	<title>주문 시스템</title>
+	
+	<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/es6-promise@4/dist/es6-promise.min.js"></script>
+	<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/es6-promise@4/dist/es6-promise.auto.min.js"></script>
+
+	<!-- 아리바바 폰트 -->
+	<link rel="stylesheet" type="text/css" href="//at.alicdn.com/t/font_2678727_za4qjydwkkh.css">
+    <link rel="stylesheet" type="text/css" href="//at.alicdn.com/t/font_1286822_sd8qjrsj4x9.css">
+    <!-- (vue)elements ui css -->
+    <link rel="stylesheet" type="text/css" href="/libs/theme/index.css">
+    
+	<link rel="stylesheet" type="text/css" href="/css/normalize.css"/>
+	<link rel="stylesheet" type="text/css" href="/css/main.css"/>
+	<link rel="stylesheet" type="text/css" href="/css/custom_el.css"/>
+	<link rel="stylesheet" type="text/css" href="/css/menuplus.css"/>
+	
+	<!-- vue.js -->
+    <!--<script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>-->
+	<!-- <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/vue"></script> -->
+	<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/vue@2.6.0"></script>
+    <script>
+        Vue.config.devtools = true;
+    </script>
+    <!-- axios.js -->
+    <!-- <script type="text/javascript" src="https://unpkg.com/axios/dist/axios.min.js"></script> -->
+    <script type="text/javascript" src="https://unpkg.com/axios@1.4.0/dist/axios.min.js"></script>
+    <!-- (vue)elements ui js -->
+    <script type="text/javascript" src="https://unpkg.com/element-ui/lib/index.js"></script>
+    <script type="text/javascript" src="https://unpkg.com/element-ui/lib/umd/locale/ko.js"></script>
+    <script type="text/javascript" src="https://unpkg.com/element-ui/lib/umd/locale/zh-CN.js"></script>
+    <script type="text/javascript" src="https://unpkg.com/element-ui/lib/umd/locale/en.js"></script>
+    
+    <!-- cropper js -->
+	<script type="text/javascript" src="/libs/vue-cropper/index.js"></script>
+	
+	<!-- 기존  QR코드 관련 js-->
+	<script type="text/javascript" src="/libs/arale-qrcode/3.0.5/index.js"></script>
+
+	<!-- NEW QR코드 관련 js-->
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
+
+	<!-- 여러 파일 다운로드 관련 js-->
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.2.2/jszip.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/amcharts/3.21.15/plugins/export/libs/FileSaver.js/FileSaver.min.js"></script>
+	
+	
+	<!-- vue.js sorting,Drag&Drop 관련 -->
+	<!-- CDNJS :: Sortable (https://cdnjs.com/) -->
+	<script src="//cdn.jsdelivr.net/npm/sortablejs@1.8.4/Sortable.min.js"></script>
+	<!-- CDNJS :: Vue.Draggable (https://cdnjs.com/) -->
+	<script src="//cdnjs.cloudflare.com/ajax/libs/Vue.Draggable/2.20.0/vuedraggable.umd.min.js"></script>
+	
+	<!-- 엑셀다운로드 관련 -->
+	<script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+	
+	<!-- 
+	<script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit&hl=en"></script>
+	
+	<script type="text/javascript">
+		function googleTranslateElementInit() {
+		  new google.translate.TranslateElement({pageLanguage: 'en'}, 'google_translate_element');
+		}
+	</script>
+	-->
+ 
+	<!-- 전역 변수 설정 -->
+	<script type="text/javascript" charset="UTF-8">
+	/*<![CDATA[*/
+		// element ui 다국어 설정
+		switch ('[[${locale}]]') {
+			case 'ko':
+				ELEMENT.locale(ELEMENT.lang.ko);
+				break;
+			case 'zh':
+				ELEMENT.locale(ELEMENT.lang.zhCN);
+				break;
+			case 'en':
+				ELEMENT.locale(ELEMENT.lang.en);
+				break;
+			default:
+				ELEMENT.locale(ELEMENT.lang.ko);
+				break;
+		}
+	
+		// 브라우저 back 버튼 제어		
+		console.log('========document.URL:' +document.URL);
+		
+		// 브라우저 back 버튼 제어
+        //history.pushState(null, null, document.URL);
+        //window.addEventListener('popstate', function () {
+        //    history.pushState(null, null, document.URL);
+        //});
+        
+        history.pushState(null, null, location.href);
+		window.onpopstate = function(event) {
+			history.go(1);
+		};
+		
+		function noEvent() {
+			if (event.keyCode == 116) {
+				event.keyCode= 2;
+				return false;
+			}else if(event.ctrlKey && (event.keyCode==78 || event.keyCode == 82)){
+				return false;
+			}
+		}
+		document.onkeydown = noEvent;
+		
+        
+	/*]]>*/
+	</script>
+    <script type="text/javascript" src="/js/axiosUtil.js"></script>
+    <script type="text/javascript" src="/js/util.js"></script>
+    <script type="text/javascript" src="/js/vueComponent.js"></script>
+    
+</head>
+</html>

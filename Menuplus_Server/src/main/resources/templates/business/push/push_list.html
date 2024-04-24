@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:include="main/import :: head"></head>
+<body>
+	<div id="app" class="contain">
+		<!-- 검색 영역 -->
+		<div class="search_form" ref="search_form">
+			<el-form :inline="true" :model="searchForm" label-width="120px" label-suffix=":" :size="size" @submit.native.prevent>
+				<el-row>
+					<el-col :span="6">
+						<el-form-item th:label="#{구분}">
+							<code-combo :data="pushTp" th:label="#{전체}" :model="searchForm.pushTpCd" @change="searchForm.pushTpCd = $event.cd"></code-combo>
+						</el-form-item>
+					</el-col>
+					<el-col :span="18">
+						<el-form-item th:label="#{기간}">
+							<el-date-picker v-model="sedtm" type="datetimerange" clearable="true" unlink-panels style="width: 360px;" :default-time="['06:00:00', '23:00:00']"
+									th:start-placeholder="#{날자 선택}" th:end-placeholder="#{날자 선택}" value-format="yyyy-MM-dd HH:mm:ss"></el-date-picker>
+						</el-form-item>
+					</el-col>
+				</el-row>
+			</el-form>
+		</div>
+		
+		<!-- 버튼 -->
+		<div class="buttons" ref="buttons">
+			<el-button th:if='${sa_actions.contains("PushSearch")}' :size="size" th:text="#{검색}" @click="search" icon="el-icon-search" ></el-button>
+			<el-button th:if='${sa_actions.contains("PushAdd")}' :size="size" th:text="#{등록}" @click="add" icon="el-icon-circle-plus-outline" :disabled="btn.addDisabled" ></el-button>
+			<el-button th:if='${sa_actions.contains("PushAdd") || sa_actions.contains("PushUp")}' :size="size" th:text="#{저장}" @click="save" icon="el-icon-check" :disabled="btn.saveDisabled" style="float: right;"></el-button>
+		</div>
+		
+		<!-- 리스트 -->
+		<el-row :gutter="20">
+			<el-col :span="12">
+				<el-table :height="tableHeight" border stripe highlight-current-row tooltip-effect="dark"
+						:data="tableData" :size="size" th:empty-text="#{데이타 없음}" @row-click="handleRowClick">
+					<el-table-column :label="tableData.length" type="index" 	width="55" align="center" sortable fixed label-class-name="data_cnt"></el-table-column>
+					<el-table-column type="selection" 							width="45" align="center" fixed></el-table-column>
+					<el-table-column th:label="#{구분}" 		prop="pushTp.nmLan" min-width="100" align="center" sortable></el-table-column>
+					<el-table-column th:label="#{타이틀}" 	prop="title" 		min-width="200" sortable show-overflow-tooltip></el-table-column>
+					<el-table-column th:label="#{발송일시}" 	prop="sendDtm"		min-width="150" align="center" sortable></el-table-column>
+				</el-table>
+			</el-col>
+			<el-col :span="12">
+				<el-card shadow="never" :style="{ height: inputHeight + 'px' }">
+					<div slot="header">
+						<span th:text="#{푸시}"></span>
+						<span v-if="'I' == inputForm.statu" th:text="#{추가}"></span>
+					</div>
+					<div>
+						<el-form :model="inputForm" label-width="120px" label-suffix=":" :size="size" :disabled="fromDisabled" @submit.native.prevent>
+							<el-form-item th:label="#{구분}" :error="formError['pushTp.cd']" required>
+								<code-combo :data="pushTp" :model="inputForm.pushTp" @change="inputForm.pushTp = $event"></code-combo>
+							</el-form-item>
+									
+							<el-form-item th:label="#{제목}" :error="formError.title" required>
+								<el-input v-model="inputForm.title" maxlength="50" clearable="true" show-word-limit></el-input>
+							</el-form-item>
+							
+							<el-form-item th:label="#{내용}" :error="formError.content" required>
+								<el-input type="textarea" v-model="inputForm.content" :autosize="{ minRows: 6, maxRows: 16 }"></el-input>
+							</el-form-item>
+						</el-form>
+					</div>
+				</el-card>
+			</el-col>
+		</el-row>
+	</div>
+	
+    <script type="text/javascript">
+	/*<![CDATA[*/
+		new Vue({
+			el: '#app',
+			data: function () {
+				var data = parent.mainVue.initData();
+				data.url = "/push";
+				
+				data.pushTp = [];
+				
+				data.searchForm = this.initSearchForm();
+				
+				data.sedtm = [util.getDate('yyyy-MM-dd HH:mm:ss', util.dateAdd('h ', -1, new Date())),
+					util.getDate('yyyy-MM-dd HH:mm:ss', util.dateAdd('h ', 1, new Date()))];
+				
+				
+				data.inputForm = this.initInputForm();
+				data.formError = this.initFormError();
+				
+				return data;
+			},
+			created: function () {
+				this.initPushTp();
+				this.search();
+			},
+			mounted: function () {
+				setTimeout(function () {
+					this.$nextTick(function () {
+						this.mainVue.currVue = this;
+					}.bind(this));	
+				}.bind(this), 500);
+			},
+			methods: {
+				// 검색 조건 초기화
+				initSearchForm: function () {
+					return {
+						startDtm: null,
+						endDtm: null,
+						pushTpCd: 0
+					}
+				},
+				// 입력폼 초기화
+				initInputForm: function () {
+					return {
+						statu: 'I',
+						pushCd: 0,
+						title: '',
+						pushTp: { cd: null, nm: '' },
+						content: ''
+					}
+				},
+				// 오류 메세지 초기화
+				initFormError: function () {
+					return {
+						title: '',
+						'pushTp.cd': '',
+						content: ''
+					}
+				},
+				// 그리드 선택 이벤트
+				handleRowClick: function (val) {
+					if (null != val) {
+						this.btn.upDisabled = false;
+					}
+					this.selectData = val;
+					
+					this.get();
+				},
+				// 약관 타입 데이타 조회
+				initPushTp: function () {
+					this.mainVue.$axios.search("/code/getCode/PUSH_TP", null, function (result) {
+						this.pushTp = result;
+					}.bind(this), false);
+				},
+				// 추가
+				add: function () {
+					this.inputForm = this.initInputForm();
+					
+					this.inputForm.pushTp = this.pushTp.length > 0 ? util.copyObj(this.pushTp[0]) : { cd: null, nm: '' };
+					
+					this.formError = this.initFormError();
+					
+					this.btn.saveDisabled = false;
+					this.fromDisabled = false;
+				},
+				// 하나 조회
+				get: function () {
+					this.mainVue.$axios.get(this.url + '/' + this.selectData.pushCd, function (result) {
+						this.inputForm = result;
+					}.bind(this), true);
+				},
+				// 조회
+				search: function () {
+					if (null == this.sedtm || this.sedtm.length < 2) {
+						this.mainVue.$message({ type: 'success', message: "[[#{기간을 선택 하여 주십시오.}]]" });
+						return;
+					}
+					
+					this.searchForm.startDtm = this.sedtm[0];
+					
+					if (this.searchForm.autoEdtm) {
+						this.sedtm = [this.sedtm[0], util.getDate('yyyy-MM-dd HH:mm:ss', new Date())]
+					}
+					
+					this.searchForm.endDtm = this.sedtm[1];
+					
+					this.mainVue.$axios.search(this.url, this.searchForm, function (result) {
+						this.tableData = result;
+						
+						this.btn.addDisabled = false;
+						this.btn.saveDisabled = true;
+						this.fromDisabled = true;
+						
+						this.inputForm = this.initInputForm();
+						this.formError = this.initFormError();
+					}.bind(this), false);
+				},
+				// 저장
+				save: function () {
+					this.formError = this.initFormError();
+					
+					this.mainVue.$axios.add(this.url, this.inputForm, this.formError, function (result) {
+						this.mainVue.$message({ type: 'success', message: "[[#{등록 성공}]]" });
+						this.search();
+					}.bind(this), true);
+				}
+		    }
+		});
+	/*]]>*/
+	</script>
+</body>
+</html>

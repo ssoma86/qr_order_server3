@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:include="main/import :: head"></head>
+<body>
+	<div id="app" class="contain">
+		<!-- 검색 영역 -->
+		<div class="search_form" ref="search_form">
+			<el-form :inline="true" :model="searchForm" label-width="120px" label-suffix=":" :size="size" @submit.native.prevent>
+				<el-row>
+					<el-col :span="6">
+						<el-form-item th:label="#{할인명}">
+							<el-input v-model="searchForm.saleNm" @keyup.enter.native="search" clearable="true"></el-input>
+						</el-form-item>
+					</el-col>
+					<el-col :span="6">
+						<el-form-item th:label="#{사용 가능 여부}">
+							<combo :data="mainVue.code.useYn" th:label="#{전체}" :model="searchForm.useYn" @change="searchForm.useYn = $event"></combo>
+						</el-form-item>
+					</el-col>
+				</el-row>
+			</el-form>
+		</div>
+		
+		<!-- 버튼 -->
+		<div class="buttons" ref="buttons">
+			<el-button th:if='${sa_actions.contains("SaleForStoreSearch")}' :size="size" th:text="#{검색}" @click="search" icon="el-icon-search" ></el-button>
+			<el-button th:if='${sa_actions.contains("SaleForStoreAdd")}' :size="size" th:text="#{등록}" @click="add" icon="el-icon-circle-plus-outline" :disabled="btn.addDisabled" ></el-button>
+			<el-button th:if='${sa_actions.contains("SaleForStoreUp")}' :size="size" th:text="#{수정}" @click="up" icon="el-icon-edit-outline" :disabled="btn.upDisabled" ></el-button>
+			<el-button th:if='${sa_actions.contains("SaleForStoreDel")}' :size="size" th:text="#{삭제}" @click="del" icon="el-icon-remove-outline" :disabled="btn.delDisabled" ></el-button>
+		</div>
+		
+		<!-- 리스트 -->
+		<el-table :height="tableHeight" border stripe highlight-current-row tooltip-effect="dark"
+				:data="tableData" :size="size" th:empty-text="#{데이타 없음}"
+				@row-click="handleRowClick" @select="handleRowChecked" @select-all="handleRowChecked">
+			<el-table-column :label="tableData.length" type="index" 	width="55" align="center" sortable label-class-name="data_cnt"></el-table-column>
+			<el-table-column type="selection" 							width="45" align="center"></el-table-column>
+			<el-table-column th:label="#{할인명}" 		prop="saleNm" 	min-width="200" sortable></el-table-column>
+			<el-table-column th:label="#{할인 대상 구분}" 	prop="saleTarget.nmLan" 	min-width="100" align="center" sortable></el-table-column>
+			<el-table-column th:label="#{표시 순서}" 		prop="ord" 		min-width="100" align="center" sortable></el-table-column>
+			<el-table-column th:label="#{할인 유형}" 		prop="saleTp.nmLan"	min-width="100" align="center" sortable></el-table-column>
+			<el-table-column th:label="#{할인 금액}" 		prop="price" 	min-width="100" align="right" sortable :formatter="mainVue.formatterNum"></el-table-column>
+			<el-table-column th:label="#{할인율}" 		prop="percente" min-width="100" align="right" sortable :formatter="mainVue.formatterPercent"></el-table-column>
+			<el-table-column th:label="#{사용 가능 여부}" 	prop="useYn" 	min-width="110" align="center" :formatter="mainVue.formatterCode"></el-table-column>
+			<el-table-column th:label="#{설명}" 			prop="saleDesc" min-width="300" show-overflow-tooltip></el-table-column>
+		</el-table>
+		
+		<!-- 입력 팝업 -->
+		<el-dialog :title="inputForm.title" :visible.sync="dialogFormVisible" fullscreen>
+			<el-form :model="inputForm" label-width="140px" label-suffix=":" :size="size" @submit.native.prevent>
+				<el-row :gutter="50">
+					<el-col :span="inputForm.saleInfos.length > 0 ? 12 : 24">
+						<el-tabs value="info">
+							<el-tab-pane th:label="#{할인 기본 정보}" name="info">
+								<el-row :gutter="20">
+									<el-col :span="inputForm.saleInfos.length > 0 ? 24 : 12">
+										<el-form-item th:label="#{할인명}" :error="formError.saleNm" required>
+											<el-input v-model="inputForm.saleNm" maxlength="50" clearable="true" show-word-limit></el-input>
+										</el-form-item>
+										<el-form-item th:label="#{할인 대상}" :error="formError['saleTarget.cd']" required>
+											<code-combo :data="saleTarget" :model="inputForm.saleTarget" @change="inputForm.saleTarget = $event"></code-combo>
+										</el-form-item>
+										<el-form-item th:label="#{할인 구분}" :error="formError['saleTp.cd']" required>
+											<code-combo :data="saleTp" :model="inputForm.saleTp" @change="inputForm.saleTp = $event"></code-combo>
+										</el-form-item>
+										<el-form-item th:label="#{할인 금액}" :error="formError.price" required v-show="inputForm.saleTp.val == 'price'">
+											<el-input-number v-model="inputForm.price" :min="0" :max="90000000" style="width: 200px;"></el-input-number>
+										</el-form-item>
+										<el-form-item th:label="#{할인율}" :error="formError.percente" required v-show="inputForm.saleTp.val == 'percent'">
+											<el-input-number v-model="inputForm.percente" :min="0" :max="100" style="width: 200px;"></el-input-number>
+										</el-form-item>
+										<el-form-item th:label="#{표시 순서}" :error="formError.ord" required>
+											<el-input-number v-model="inputForm.ord" :min="1" :max="99"></el-input-number>
+										</el-form-item>
+										<el-form-item th:label="#{사용 가능 여부}" required>
+											<combo :data="mainVue.code.useYn" :model="inputForm.useYn" @change="inputForm.useYn = $event"></combo>
+										</el-form-item>
+										
+										<el-form-item th:label="#{설명}" :error="formError.saleDesc">
+											<el-input v-model="inputForm.saleDesc" type="textarea" maxlength="250" show-word-limit></el-input>
+										</el-form-item>
+									</el-col>
+								</el-row>
+							</el-tab-pane>
+						</el-tabs>
+					</el-col>
+					<el-col :span="12" v-if="inputForm.saleInfos.length > 0">
+						<el-tabs v-model="activiTab">
+							<el-tab-pane v-for="(item, index) in inputForm.saleInfos" :key="item.lanTp.id" :label="item.lanTp.nm" :name="item.lanTp.id">
+								<el-form-item th:label="#{할인명}" :error="formError['saleInfos[' + index + '].saleInfoNm']" required>
+									<el-input v-model="inputForm.saleInfos[index].saleInfoNm" maxlength="50" clearable="true" show-word-limit></el-input>
+								</el-form-item>
+								
+								<el-form-item th:label="#{할인 금액}" :error="formError['saleInfos[' + index + '].price']" required v-show="inputForm.saleTp.val == 'price'">
+									<el-input-number v-model="inputForm.saleInfos[index].price" :min="0" :max="90000000" style="width: 200px;"></el-input-number>
+								</el-form-item>
+								
+								<el-form-item th:label="#{할인율}" :error="formError['saleInfos[' + index + '].percente']" required v-show="inputForm.saleTp.val == 'percent'">
+									<el-input-number v-model="inputForm.saleInfos[index].percente" :min="0" :max="100" style="width: 200px;"></el-input-number>
+								</el-form-item>
+							</el-tab-pane>
+						</el-tabs>
+					</el-col>
+				</el-row>
+			</el-form>
+			<div slot="footer" class="dialog-footer">
+				<el-button th:text="#{저장}" icon="el-icon-check" :size="size" @click="save" :disabled="btn.saveDisabled"></el-button>
+				<el-button th:text="#{닫기}" icon="el-icon-close" :size="size" @click="dialogFormVisible = false"></el-button>
+			</div>
+		</el-dialog>
+	</div>
+	
+    <script type="text/javascript">
+	/*<![CDATA[*/
+		new Vue({
+			el: '#app',
+			data: function () {
+				var data = parent.mainVue.initData();
+				data.url = '/sale/store';
+				data.storeLans = [];
+				data.saleTarget = [];
+				data.saleTp = [];
+				data.activiTab = '';
+				
+				data.searchForm = this.initSearchForm();
+				data.inputForm = this.initInputForm();
+				data.formError = this.initFormError();
+				
+				return data;
+			},
+			created: function () {
+				this.initStoreLans();
+				this.initSaleTarget();
+				this.initSaleTp();
+				this.search();
+			},
+			mounted: function () {
+				setTimeout(function () {
+					this.$nextTick(function () {
+						this.mainVue.currVue = this;
+					}.bind(this));
+				}.bind(this), 500);
+			},
+			watch: {
+				formError: {
+					deep: true,
+					handler(newVal, oldVal) {
+						var i = 100;
+						for (val in newVal) {
+							if (val.indexOf('saleInfos') > -1) {
+								if ('' != newVal[val]) {
+									if (i > val.replace(/[^0-9]*/g,"")) {
+										i = parseInt(val.replace(/[^0-9]*/g,""));
+									}
+								}
+							}
+						}
+						
+						if (100 != i) {
+							this.activiTab = this.inputForm.saleInfos[i].lanTp.id;	
+						}
+					}
+				}
+			},
+			methods: {
+				// 검색 조건 초기화
+				initSearchForm: function () {
+					return {
+						saleNm: '',
+						useYn: ''
+					}
+				},
+				// 입력폼 초기화
+				initInputForm: function () {
+					return {
+						statu: "I",
+						title: '',
+						saleCd: 0,
+						saleNm: '',
+						price: 0,
+						percente: 0,
+						saleInfos: [],
+						saleTarget: { cd: null, nm: '' },
+						saleTp: { cd: null, nm: '' },
+						ord: 1,
+						useYn: 'Y',
+						saleDesc: ''
+					}
+				},
+				// 오류 메세지 초기화
+				initFormError: function () {
+					return {
+						saleNm: '',
+						price: '',
+						percente: '',
+						'saleTarget.cd': '',
+						'saleTp.cd': '',
+						ord: '',
+						useYn: '',
+						saleDesc: ''
+					}
+				},
+				// 그리드 선택 이벤트
+				handleRowClick: function (val) {
+					if (null != val) {
+						this.btn.upDisabled = false;
+					}
+					this.selectData = val;
+				},
+				// 체크 박스 체크 이벤트
+				handleRowChecked: function (selection, row) {
+					if (selection.length > 0) {
+						this.btn.delDisabled = false;	
+					} else {
+						this.btn.delDisabled = true;
+					}
+					
+					this.checkedData = [];
+					
+					for (var i = 0, len = selection.length; i < len; i++) {
+						this.checkedData[this.checkedData.length] = selection[i].saleCd;
+					}
+				},
+				initStoreLans: function () {
+					this.mainVue.$axios.search('/store/getStoreLans', null, function (result) {
+						this.storeLans = result;
+					}.bind(this));
+				},
+				// 할인 대상 조회
+				initSaleTarget: function (storeCd) {
+					this.mainVue.$axios.search("/code/getCode/SALE_TARGET", null, function (result) {
+						this.saleTarget = result;
+					}.bind(this), false);
+				},
+				// 할인 구분 조회
+				initSaleTp: function (storeCd) {
+					this.mainVue.$axios.search("/code/getCode/SALE_TP", null, function (result) {
+						this.saleTp = result;
+					}.bind(this), false);
+				},
+				// 추가
+				add: function () {
+					this.inputForm = this.initInputForm();
+					this.inputForm.title = '[[#{할인 추가}]]';
+					
+					this.formError = this.initFormError();
+					
+					if (this.storeLans.length > 0) {
+						this.inputForm.saleInfos = [];
+						
+						for (var i = 0, len = this.storeLans.length; i < len; i++) {
+							this.formError['saleInfos[' + i + '].saleInfoNm'] = '';
+							this.formError['saleInfos[' + i + '].price'] = '';
+							this.formError['saleInfos[' + i + '].percente'] = '';
+							
+	 						this.inputForm.saleInfos.push({
+	 							lanTp: this.storeLans[i],
+	 							saleInfoNm: '',
+	 							price: 0,
+	 							percente: 0
+	 						});
+							
+	 						if (i === 0) {
+	 							this.activiTab = this.storeLans[i].id;
+	 						}
+						}
+					}
+					
+					this.inputForm.saleTarget = this.saleTarget.length > 0 ? util.copyObj(this.saleTarget[0]) : { cd: null, nm: '' };
+					this.inputForm.saleTp = this.saleTp.length > 0 ? util.copyObj(this.saleTp[0]) : { cd: null, nm: '' };
+					
+					this.dialogFormVisible = true;
+					this.btn.saveDisabled = false;
+				},
+				// 수정
+				up: function () {
+					this.mainVue.$axios.get(this.url + '/' + this.selectData.saleCd, function (result) {
+						result.statu = "U";
+						result.title = "[[#{할인 수정}]]";
+						
+						this.formError = this.initFormError();
+						
+						this.inputForm = result;
+						
+						// 수정 시 매장 다국어 삭제 시 카테고리도 다국어 지워줌
+						var saleInfosTmp = [];
+						
+						if (this.inputForm.statu == "U") {
+							saleInfosTmp = util.copyObj(this.inputForm.saleInfos);	
+						}
+						
+						this.inputForm.saleInfos = [];
+						
+						for (var i = 0, len = this.storeLans.length; i < len; i++) {
+							this.formError['saleInfos[' + i + '].saleInfoNm'] = '';
+							this.formError['saleInfos[' + i + '].price'] = '';
+							this.formError['saleInfos[' + i + '].percente'] = '';
+							
+							var saleInfoNm = '';
+							var price = 0;
+							var percente = 0;
+							
+							if (this.inputForm.statu == "U") {
+								for (var k = 0, klen = saleInfosTmp.length; k < klen; k++) {
+									if (saleInfosTmp[k].lanTp.id == this.storeLans[i].id) {
+										saleInfoNm = saleInfosTmp[k].saleInfoNm;
+										price = saleInfosTmp[k].price;
+										percente = saleInfosTmp[k].percente;
+									}
+								}
+							}
+							
+	 						this.inputForm.saleInfos.push({
+	 							lanTp: this.storeLans[i],
+	 							saleInfoNm: saleInfoNm,
+	 							price: price,
+	 							percente: percente
+	 						});
+							
+	 						if (i === 0) {
+	 							this.activiTab = this.storeLans[i].id;
+	 						}
+						}
+						
+						this.dialogFormVisible = true;
+						this.btn.saveDisabled = false;
+					}.bind(this), true);
+				},
+				// 조회
+				search: function () {
+					this.mainVue.$axios.search(this.url, this.searchForm, function (result) {
+						this.tableData = result;
+						
+						this.btn.addDisabled = false;
+						this.btn.upDisabled = true;
+						this.btn.delDisabled = true;
+						
+						this.inputForm = this.initInputForm();
+						this.formError = this.initFormError();
+					}.bind(this), false);
+				},
+				// 삭제
+				del: function () {
+					this.mainVue.$confirm("[[#{{0}를 삭제 하시겠습니까?(#{할인 정보})}]]", this.mainVue.appMsg.systemAlterTitle, {
+				          confirmButtonText: "[[#{삭제}]]",
+				          cancelButtonText: "[[#{취소}]]",
+				          type: 'info'
+				        }).then(function () {
+				        	this.mainVue.$axios.del(this.url + "/" + this.checkedData.join(","), function (result) {
+				        		this.mainVue.$message({ type: 'success', message: "[[#{삭제 성공}]]" });
+				        		this.search();
+							}.bind(this), true);
+				        }.bind(this)).catch(function () {
+				        	this.mainVue.$message({ type: 'info', message: "[[#{삭제 취소}]]" });
+				        }.bind(this));
+				},
+				// 저장
+				save: function () {
+					this.formError = this.initFormError();
+					
+					for (var i = 0, len = this.inputForm.saleInfos.length; i < len; i++) {
+						this.formError['saleInfos[' + i + '].saleInfoNm'] = '';
+						this.formError['saleInfos[' + i + '].price'] = '';
+						this.formError['saleInfos[' + i + '].percente'] = '';
+					}
+					
+					if ('I' === this.inputForm.statu) {
+						this.mainVue.$axios.add(this.url, this.inputForm, this.formError, function (result) {
+							this.mainVue.$message({ type: 'success', message: "[[#{등록 성공}]]" });
+							this.dialogFormVisible = false;
+							this.search();
+						}.bind(this), true);
+					} else {
+						this.mainVue.$axios.up(this.url + "/" + this.inputForm.saleCd, this.inputForm, this.formError, function (result) {
+							this.mainVue.$message({ type: 'success', message: "[[#{수정 성공}]]" });
+							this.dialogFormVisible = false;
+							this.search();
+						}.bind(this), true);
+					}
+				}
+		    }
+		});
+	/*]]>*/
+	</script>
+</body>
+</html>

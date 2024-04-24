@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:include="main/import :: head"></head>
+<body>
+
+	<style type="text/css">
+		.avatar-uploader-icon { font-size: 28px; color: #8c939d; width: 300px; height: 81px; line-height: 81px; text-align: center; }
+		.avatar { width: 300px; height: 81px; display: block; }
+	</style>
+
+	<div id="app" class="contain">
+		<!-- 검색 조건 -->
+		<div class="search_form" ref="search_form">
+			<el-form :inline="true" :model="searchForm" label-width="150px" label-suffix=":" :size="size" @submit.native.prevent>
+				<el-row>
+					<el-col :span="8">
+						<el-form-item th:label="#{사용 가능 여부}">
+							<combo :data="mainVue.code.useYn" th:label="#{전체}" :model="searchForm.useYn" @change="searchForm.useYn = $event"></combo>
+						</el-form-item>
+					</el-col>
+				</el-row>
+			</el-form>
+		</div>
+		
+		<!-- 버튼-->
+		<div class="buttons" ref="buttons">
+			<el-button th:if='${sa_actions.contains("BannerSearch")}' :size="size" th:text="#{검색}" @click="search" icon="el-icon-search" ></el-button>
+			<el-button th:if='${sa_actions.contains("BannerAdd")}' :size="size" th:text="#{등록}" @click="add" icon="el-icon-circle-plus-outline" :disabled="btn.addDisabled" ></el-button>
+			<el-button th:if='${sa_actions.contains("BannerUp")}' :size="size" th:text="#{수정}" @click="up" icon="el-icon-edit-outline" :disabled="btn.upDisabled" ></el-button>
+<!-- 			<el-button th:if='${sa_actions.contains("BannerDel")}' :size="size" th:text="#{삭제}" @click="del" icon="el-icon-remove-outline" :disabled="btn.delDisabled" ></el-button> -->
+		</div>
+		
+		<!-- 리스트 -->
+		<el-table :height="tableHeight" border stripe highlight-current-row tooltip-effect="dark"
+				:data="tableData" :size="size" th:empty-text="#{데이타 없음}"
+				@row-click="handleRowClick" @select="handleRowChecked">
+			<el-table-column :label="tableData.length" type="index" 	width="55" align="center" sortable fixed label-class-name="data_cnt"></el-table-column>
+			<el-table-column th:label="#{사용 설정}" align="center" width="150">
+				<template slot-scope="scope">
+					<el-button size="mini" type="primary" @click="setting(scope.row.bannerCd, 'Y')" style="width: 100px;"
+						th:text="#{사용}" v-if="'N' == scope.row.useYn"></el-button>
+					<el-button size="mini" type="info" @click="setting(scope.row.bannerCd, 'N')" style="width: 100px;"
+						th:text="#{사용중지}" v-else></el-button>
+				</template>
+			</el-table-column>
+			<el-table-column th:label="#{배너 이미지}" prop="bannerImg" min-width="350" align="center">
+				<template slot-scope="scope">
+					<el-image style="width: 300px; height: 81px;" :src="scope.row.bannerImg" fit="fill"></el-image>
+				</template>
+			</el-table-column>
+		</el-table>
+		
+		<!-- 입력 팝업 -->
+		<el-dialog :title="inputForm.title" :visible.sync="dialogFormVisible">
+			<el-form :model="inputForm" label-width="140px" label-suffix=":" :size="size" @submit.native.prevent>
+				<el-form-item :error="formError['bannerImgFile']" required>
+					<el-upload class="avatar-uploader" accept="image/*" :show-file-list="false" :auto-upload="false" :on-change="imgChange">
+						<img v-if="inputForm.bannerImg || inputForm.bannerImgFile" :src="inputForm.bannerImgFile" class="avatar"/>
+						<i v-else class="el-icon-plus avatar-uploader-icon"></i>
+					</el-upload>
+				</el-form-item>
+			</el-form>
+			
+			<div slot="footer" class="dialog-footer">
+				<el-button th:text="#{저장}" icon="el-icon-check" :size="size" @click="save" :disabled="btn.saveDisabled"></el-button>
+				<el-button th:text="#{닫기}" icon="el-icon-close" :size="size" @click="dialogFormVisible = false"></el-button>
+			</div>
+		</el-dialog>
+		
+	</div>
+	
+    <script type="text/javascript" charset="UTF-8">
+	/*<![CDATA[*/
+		new Vue({
+			el: '#app',
+			data: function () {
+				var data = parent.mainVue.initData();
+				data.url = "/banner";
+				
+				data.searchForm = this.initSearchForm();
+				data.inputForm = this.initInputForm();
+				data.formError = this.initFormError();
+				
+				return data;
+			},
+			created: function () {
+				this.search();
+			},
+			mounted: function () {
+				setTimeout(function () {
+					this.$nextTick(function () {
+						this.mainVue.currVue = this;
+					}.bind(this));
+				}.bind(this), 500);
+			},
+			methods: {
+				// 검색 조건 초기화
+				initSearchForm: function () {
+					return {
+						useYn: ''
+					}
+				},
+				// 입력폼 초기화
+				initInputForm: function () {
+					return {
+						statu: "I",
+						bannerCd: null,
+						bannerImg: '',
+						bannerImgFile: '',
+						useYn: 'Y'
+					}
+				},
+				// 오류 메세지 초기화
+				initFormError: function () {
+					return {
+						bannerImgFile: ''
+					}
+				},
+				// 그리드 선택 이벤트
+				handleRowClick: function (val) {
+					if (null != val) {
+						this.btn.upDisabled = false;
+					}
+					this.selectData = val;
+				},
+				// 체크 박스 체크 이벤트
+				handleRowChecked: function (selection, row) {
+					if (selection.length > 0) {
+						this.btn.delDisabled = false;	
+					} else {
+						this.btn.delDisabled = true;
+					}
+					
+					this.checkedData = [];
+					
+					for (var i = 0, len = selection.length; i < len; i++) {
+						this.checkedData[this.checkedData.length] = selection[i].bannerCd;
+					}
+				},
+				// 추가
+				add: function () {
+					this.inputForm = this.initInputForm();
+					this.formError = this.initFormError();
+					
+					this.dialogFormVisible = true;
+					this.btn.saveDisabled = false;
+					
+					this.inputForm.title = "[[#{배너 추가}]]";
+				},
+				// 수정
+				up: function () {
+					this.mainVue.$axios.get(this.url + '/' + this.selectData.bannerCd, function (result) {
+						result.statu = "U";
+						result.bannerImgFile = result.bannerImg;
+						result.title = "[[#{배너 수정}]]";
+						this.inputForm = result;
+						
+						this.formError = this.initFormError();
+						
+						this.dialogFormVisible = true;
+						this.btn.saveDisabled = false;
+					}.bind(this));
+				},
+				// 조회
+				search: function () {
+					this.mainVue.$axios.search(this.url, this.searchForm, function (result) {
+						this.tableData = result;
+						
+						this.btn.addDisabled = false;
+						this.btn.upDisabled = true;
+						this.btn.delDisabled = true;
+						
+						this.inputForm = this.initInputForm();
+						this.formError = this.initFormError();
+					}.bind(this), false);
+				},
+				// 삭제
+				setting: function (bannerCd, useYn) {
+					this.mainVue.$confirm(('Y' == useYn ? "[[#{배너 이미지 사용으로 설정 하시겠습니까?}]]" : "[[#{배너 이미지 사용중지 하시겠습니까?}]]"), this.mainVue.appMsg.systemAlterTitle, {
+				          confirmButtonText: ('Y' == useYn ? "[[#{사용}]]" : "[[#{사용중지}]]"),
+				          cancelButtonText: "[[#{취소}]]",
+				          type: 'info'
+				        }).then(function () {
+				        	this.mainVue.$axios.patch(this.url + "/" + bannerCd + "/" + useYn, null, null, function (result) {
+				        		this.mainVue.$message({ type: 'success', message: "[[#{설정 성공}]]" });
+				        		this.search();
+							}.bind(this));
+				        }.bind(this)).catch(function () {
+				        	this.mainVue.$message({ type: 'info', message: "[[#{설정 취소}]]" });
+				        }.bind(this));
+				},
+				// 저장
+				save: function () {
+					this.formError = this.initFormError();
+					
+					if (util.isEmpty(this.inputForm.bannerImgFile)) {
+						this.formError.bannerImgFile = "[[#{배너 이미지를 선택 하여 주십시오.}]]";
+						return;
+					}
+					
+					if ('I' === this.inputForm.statu) {
+						this.mainVue.$axios.add(this.url, this.inputForm, this.formError, function (result) {
+							this.mainVue.$message({ type: 'success', message: "[[#{등록 성공}]]" });
+							this.dialogFormVisible = false;
+							this.search();
+						}.bind(this));
+					} else {
+						this.mainVue.$axios.up(this.url + "/" + this.inputForm.bannerCd, this.inputForm, this.formError, function (result) {
+							this.mainVue.$message({ type: 'success', message: "[[#{수정 성공}]]" });
+							this.dialogFormVisible = false;
+							this.search();
+						}.bind(this));
+					}
+				},
+				// 이미지 선택
+				imgChange: function (file) {
+					util.imgToBase64(URL.createObjectURL(file.raw), file.raw.type, function (data, img) {
+							this.inputForm.bannerImgFile = data;	
+					}.bind(this));
+				}
+		    }
+		});
+	/*]]>*/
+	</script>
+</body>
+</html>

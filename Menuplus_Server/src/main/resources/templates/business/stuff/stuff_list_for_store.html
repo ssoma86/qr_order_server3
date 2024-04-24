@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:include="main/import :: head"></head>
+<body>
+	<div id="app" class="contain">
+		<!-- 검색 영역 -->
+		<div class="search_form" ref="search_form">
+			<el-form :inline="true" :model="searchForm" label-width="120px" label-suffix=":" :size="size" @submit.native.prevent>
+				<el-row>
+					<el-col :span="6">
+						<el-form-item th:label="#{재료명}">
+							<el-input v-model="searchForm.stuffNm" @keyup.enter.native="search" clearable="true"></el-input>
+						</el-form-item>
+					</el-col>
+					<el-col :span="6">
+						<el-form-item th:label="#{사용 가능 여부}">
+							<combo :data="mainVue.code.useYn" th:label="#{전체}" :model="searchForm.useYn" @change="searchForm.useYn = $event"></combo>
+						</el-form-item>
+					</el-col>
+				</el-row>
+			</el-form>
+		</div>
+		
+		<!-- 버튼 -->
+		<div class="buttons" ref="buttons">
+			<el-button th:if='${sa_actions.contains("StuffForStoreSearch")}' :size="size" th:text="#{검색}" @click="search" icon="el-icon-search" ></el-button>
+			<el-button th:if='${sa_actions.contains("StuffForStoreAdd")}' :size="size" th:text="#{등록}" @click="add" icon="el-icon-circle-plus-outline" :disabled="btn.addDisabled" ></el-button>
+			<el-button th:if='${sa_actions.contains("StuffForStoreUp")}' :size="size" th:text="#{수정}" @click="up" icon="el-icon-edit-outline" :disabled="btn.upDisabled" ></el-button>
+			<el-button th:if='${sa_actions.contains("StuffForStoreDel")}' :size="size" th:text="#{삭제}" @click="del" icon="el-icon-remove-outline" :disabled="btn.delDisabled" ></el-button>
+			
+			<template th:if='${sa_actions.contains("StuffForStoreAdd") || sa_actions.contains("StuffForStoreUp")}'>
+	            <el-popover placement="right" width="600" trigger="click" style="margin-left: 10px;">
+	            	<div>
+		            	<div style="margin: 10px;">
+	            			<div th:text="#{* 양식 파일 첫줄 해더 이름 기준으로 데이타 업로드 됩니다. 수정 하시면 업로드 안되거나 오류 발생 할 수 있습니다.}"></div>
+	            		</div>
+		            	<el-button :size="size" th:text="#{업로드 양식 다운로드}" @click="downExcel" icon="el-icon-download" style="margin-left: 10px;"></el-button>
+		            	
+		            	<el-divider></el-divider>
+				        
+				        <div style="margin: 10px;">
+	            			<div th:text="#{* 재료 데이터 업로드를 추가적으로 할 경우, 추가할 재료만 양식에 적어 업로드하여야 데이터 중복 등록이 되지 않습니다.}"></div>
+	            		</div>
+	            		
+				        <el-upload :show-file-list="false" action="/stuff/store/up" accept="application/vnd.ms-excel"
+					       		 style="display: inline; margin-left: 10px;" :on-success="upSuccess" :on-error="upError">
+					  		<el-button :size="size" th:text="#{재료 데이타 업로드}" icon="el-icon-upload"></el-button>
+						</el-upload>
+	            	</div>
+	            	
+	            	<el-button slot="reference" :size="size" th:text="#{재료 업로드}" icon="el-icon-upload"></el-button>
+				</el-popover>
+			</template>
+		</div>
+		
+		<!-- 리스트 -->
+		<el-table :height="tableHeight" border stripe highlight-current-row tooltip-effect="dark"
+				:data="tableData" :size="size" th:empty-text="#{데이타 없음}"
+				@row-click="handleRowClick" @select="handleRowChecked" @select-all="handleRowChecked">
+			<el-table-column :label="tableData.length" type="index" 	width="55" align="center" sortable label-class-name="data_cnt"></el-table-column>
+			<el-table-column type="selection" 							width="45" align="center"></el-table-column>
+			<el-table-column th:label="#{재료명}" 		prop="stuffNmLan" 	min-width="200" sortable show-overflow-tooltip></el-table-column>
+			<el-table-column th:label="#{원산지}" 		prop="stuffNationNm" 	min-width="200" sortable show-overflow-tooltip></el-table-column>
+			<el-table-column th:label="#{사용 가능 여부}" 	prop="useYn" 		min-width="110" align="center" :formatter="mainVue.formatterCode"></el-table-column>
+			<el-table-column th:label="#{설명}" 			prop="stuffDesc" min-width="300" show-overflow-tooltip></el-table-column>
+		</el-table>
+		
+		<!-- 입력 팝업 -->
+		<el-dialog :title="inputForm.title" :visible.sync="dialogFormVisible" width="500px">
+			<el-form :model="inputForm" label-width="140px" label-suffix=":" :size="size" @submit.native.prevent>
+				<el-row :gutter="20">
+					<el-col :span="inputForm.stuffInfos.length > 0 ? 12 : 24">
+						<el-tabs value="info">
+							<el-tab-pane th:label="#{기본 정보}" name="info">
+								<el-row :gutter="20">
+									<el-col :span="inputForm.stuffInfos.length > 0 ? 24 : 24">
+										<el-form-item th:label="#{재료명}" :error="formError.stuffNm" required>
+											<el-input v-model="inputForm.stuffNm" maxlength="50" clearable="true" show-word-limit>
+												<el-button v-if="lans.length > 1" slot="append" :size="size" th:text="#{다국어 조회}" @click="dictionaryTp = 'nm'; dictionaryDialogFormVisible = true" icon="el-icon-search"></el-button>
+											</el-input>
+											
+											<!-- 사전 선택 -->
+											<el-dialog th:title="#{다국어 사전}" :visible.sync="dictionaryDialogFormVisible" width="900px" append-to-body>
+												<div class="search_form" style="margin-bottom: 10px;">
+													<el-form :inline="true" label-width="60px" label-suffix=":" :size="size" @submit.native.prevent>
+														<el-form-item th:label="#{언어}">
+															<el-input v-model="searchText" @keyup.enter.native="searchDictionary" clearable="true" style="width: 190%;">
+																<el-button slot="append" :size="size" th:text="#{검색}" @click="searchDictionary" icon="el-icon-search"></el-button>
+															</el-input>
+														</el-form-item>
+													</el-form>
+												</div>
+									
+												<el-table :height="tableHeight/2" border stripe highlight-current-row tooltip-effect="dark"
+														:data="popTableData" :size="size" th:empty-text="#{언어 코드}">
+									      
+													<el-table-column fixed>
+														<template slot-scope="scope">
+															<el-button :size="size" th:text="#{선택}" @click="selectDictionary(scope.row)"></el-button>
+														</template>
+													</el-table-column>
+									
+													<el-table-column th:label="#{언어 코드}" prop="id" min-width="200" sortable show-overflow-tooltip></el-table-column>
+													<el-table-column v-for="item in lans" :label="item.nm" :prop="item.id" min-width="200" sortable show-overflow-tooltip></el-table-column>
+												</el-table>
+									
+											</el-dialog>
+										</el-form-item>
+										
+										<el-form-item th:label="#{원산지}" :error="formError.stuffNation">
+											<el-input v-model="inputForm.stuffNation" maxlength="50" clearable="true" show-word-limit>
+												<el-button v-if="lans.length > 1" slot="append" :size="size" th:text="#{다국어 조회}" @click="dictionaryTp = 'nation'; dictionaryDialogFormVisible = true" icon="el-icon-search"></el-button>
+											</el-input>
+										</el-form-item>
+										
+										<el-form-item th:label="#{사용 가능 여부}" required>
+											<combo :data="mainVue.code.useYn" :model="inputForm.useYn" @change="inputForm.useYn = $event"></combo>
+										</el-form-item>
+										
+										<el-form-item th:label="#{설명}" :error="formError.stuffDesc">
+											<el-input v-model="inputForm.stuffDesc" type="textarea" maxlength="250" show-word-limit rows="5"></el-input>
+										</el-form-item>
+									</el-col>
+								</el-row>
+							</el-tab-pane>
+						</el-tabs>
+					</el-col>
+					<el-col :span="12">
+						<el-tabs v-model="activiTab" v-if="inputForm.stuffInfos.length > 0">
+							<el-tab-pane v-for="(item, index) in inputForm.stuffInfos" :key="item.lanTp.id" :label="item.lanTp.nm" :name="item.lanTp.id">
+								<el-form-item th:label="#{재료명}" :error="formError['stuffInfos[' + index + '].stuffInfoNm']" required>
+									<el-input v-model="inputForm.stuffInfos[index].stuffInfoNm" maxlength="50" clearable="true" show-word-limit></el-input>
+								</el-form-item>
+								
+								<el-form-item th:label="#{원산지}" :error="formError['stuffInfos[' + index + '].stuffInfoNation']">
+									<el-input v-model="inputForm.stuffInfos[index].stuffInfoNation" maxlength="50" clearable="true" show-word-limit></el-input>
+								</el-form-item>
+							</el-tab-pane>
+						</el-tabs>
+					</el-col>
+				</el-row>
+			</el-form>
+			<div slot="footer" class="dialog-footer">
+				<el-button th:text="#{저장}" icon="el-icon-check" :size="size" @click="save" :disabled="btn.saveDisabled"></el-button>
+				<el-button th:text="#{닫기}" icon="el-icon-close" :size="size" @click="dialogFormVisible = false"></el-button>
+			</div>
+		</el-dialog>
+	</div>
+	
+    <script type="text/javascript">
+	/*<![CDATA[*/
+		new Vue({
+			el: '#app',
+			data: function () {
+				var data = parent.mainVue.initData();
+				data.url = '/stuff/store';
+				data.storeLans = [];
+				data.activiTab = '';
+				
+				data.searchForm = this.initSearchForm();
+				data.inputForm = this.initInputForm();
+				data.formError = this.initFormError();
+				
+				data.lans = [];
+				data.popTableData = [];
+				
+				data.dictionaryDialogFormVisible = false;
+				data.searchText = '';
+				data.dictionaryTp = 'nm'; // nation
+				
+				return data;
+			},
+			created: function () {
+				this.initStore();
+				this.search();
+			},
+			mounted: function () {
+				setTimeout(function () {
+					this.$nextTick(function () {
+						this.mainVue.currVue = this;
+					}.bind(this));
+				}.bind(this), 500);
+			},
+			watch: {
+				formError: {
+					deep: true,
+					handler: function (newVal, oldVal) {
+						// 벨리데이션 메세지가 값은 있는데 Vue에서 표시 안해주는 현상 처리 하기 위함
+						setTimeout(function () {
+							var tmp = this.inputForm.stuffNm;
+							this.inputForm.stuffNm = this.inputForm.stuffNm + ' ';
+							this.inputForm.stuffNm = tmp;
+							
+							var i = 100;
+							for (val in newVal) {
+								if (val.indexOf('stuffInfos') > -1) {
+									if ('' != newVal[val]) {
+										if (i > val.replace(/[^0-9]*/g,"")) {
+											i = parseInt(val.replace(/[^0-9]*/g,""));
+										}
+									}
+								}
+							}
+							
+							if (100 != i) {
+								this.activiTab = this.inputForm.stuffInfos[i].lanTp.id;	
+							}
+						}.bind(this), 500);
+					}
+				}
+			},
+			methods: {
+				// 검색 조건 초기화
+				initSearchForm: function () {
+					return {
+						stuffNm: '',
+						useYn: 'Y'
+					}
+				},
+				// 입력폼 초기화
+				initInputForm: function () {
+					return {
+						statu: "I",
+						title: '',
+						stuffCd: 0,
+						stuffNm: '',
+						stuffNation: '',
+						stuffInfos: [],
+						useYn: 'Y',
+						stuffDesc: ''
+					}
+				},
+				// 오류 메세지 초기화
+				initFormError: function () {
+					return {
+						stuffNm: '',
+						stuffNation: '',
+						useYn: '',
+						stuffDesc: ''
+					}
+				},
+				// 그리드 선택 이벤트
+				handleRowClick: function (val) {
+					if (null != val) {
+						this.btn.upDisabled = false;
+					}
+					this.selectData = val;
+				},
+				// 체크 박스 체크 이벤트
+				handleRowChecked: function (selection, row) {
+					if (selection.length > 0) {
+						this.btn.delDisabled = false;	
+					} else {
+						this.btn.delDisabled = true;
+					}
+					
+					this.checkedData = [];
+					
+					for (var i = 0, len = selection.length; i < len; i++) {
+						this.checkedData[this.checkedData.length] = selection[i].stuffCd;
+					}
+				},
+				initStore: function () {
+					this.mainVue.$axios.search('/store/getStore', null, function (result) {
+						this.storeLans = result.lans;
+						this.initStoreLans(result);
+					}.bind(this));
+				},
+				// 사전 조회를 위한 언어 정보 설정
+				initStoreLans: function (store) {
+					this.lans = [];
+					this.lans.push(store.defaultLan);
+					
+					for (var i = 0, len = store.lans.length; i < len; i++) {
+						this.lans.push(store.lans[i]);
+					}
+				},
+				// 추가
+				add: function () {
+					this.inputForm = this.initInputForm();
+					this.inputForm.title = '[[#{재료 추가}]]';
+					
+					this.formError = this.initFormError();
+					
+					if (this.storeLans.length > 0) {
+						this.inputForm.stuffInfos = [];
+						
+						for (var i = 0, len = this.storeLans.length; i < len; i++) {
+							this.formError['stuffInfos[' + i + '].stuffInfoNm'] = '';
+							this.formError['stuffInfos[' + i + '].stuffInfoNation'] = '';
+							
+	 						this.inputForm.stuffInfos.push({
+	 							lanTp: this.storeLans[i],
+	 							stuffInfoNm: '',
+	 							stuffInfoNation: ''
+	 						});
+							
+	 						if (i === 0) {
+	 							this.activiTab = this.storeLans[i].id;
+	 						}
+						}
+					}
+					
+					this.dialogFormVisible = true;
+					this.btn.saveDisabled = false;
+				},
+				// 수정
+				up: function () {
+					this.mainVue.$axios.get(this.url + '/' + this.selectData.stuffCd, function (result) {
+						result.statu = "U";
+						result.title = "[[#{재료 수정}]]";
+						
+						try {
+							this.formError = this.initFormError();
+							
+							this.inputForm = result;
+							
+							// 수정 시 매장 다국어 삭제 시 카테고리도 다국어 지워줌
+							var stuffInfosTmp = [];
+							
+							if (this.inputForm.statu == "U") {
+								stuffInfosTmp = util.copyObj(this.inputForm.stuffInfos);	
+							}
+							
+							this.inputForm.stuffInfos = [];
+							
+							for (var i = 0, len = this.storeLans.length; i < len; i++) {
+								this.formError['stuffInfos[' + i + '].stuffInfoNm'] = '';
+								this.formError['stuffInfos[' + i + '].stuffInfoNation'] = '';
+								
+								var stuffInfoNm = '';
+								var stuffInfoNation = '';
+								
+								if (this.inputForm.statu == "U") {
+									for (var k = 0, klen = stuffInfosTmp.length; k < klen; k++) {
+										if (stuffInfosTmp[k].lanTp.id == this.storeLans[i].id) {
+											stuffInfoNm = stuffInfosTmp[k].stuffInfoNm;
+											stuffInfoNation = stuffInfosTmp[k].stuffInfoNation;
+										}
+									}
+								}
+								
+		 						this.inputForm.stuffInfos.push({
+		 							lanTp: this.storeLans[i],
+		 							stuffInfoNm: stuffInfoNm,
+		 							stuffInfoNation: stuffInfoNation
+		 						});
+								
+		 						if (i === 0) {
+		 							this.activiTab = this.storeLans[i].id;
+		 						}
+							}
+						} catch (e) {
+						}
+						
+						this.dialogFormVisible = true;
+						this.btn.saveDisabled = false;
+					}.bind(this), true);
+				},
+				// 조회
+				search: function () {
+					this.mainVue.$axios.search(this.url, this.searchForm, function (result) {
+						this.tableData = result;
+						
+						this.btn.addDisabled = false;
+						this.btn.upDisabled = true;
+						this.btn.delDisabled = true;
+						
+						this.inputForm = this.initInputForm();
+						this.formError = this.initFormError();
+					}.bind(this), false);
+				},
+				// 삭제
+				del: function () {
+					this.mainVue.$confirm("[[#{{0}를 삭제 하시겠습니까?(#{재료 정보})}]]", this.mainVue.appMsg.systemAlterTitle, {
+				          confirmButtonText: "[[#{삭제}]]",
+				          cancelButtonText: "[[#{취소}]]",
+				          type: 'info'
+				        }).then(function () {
+				        	this.mainVue.$axios.del(this.url + "/" + this.checkedData.join(","), function (result) {
+				        		this.mainVue.$message({ type: 'success', message: "[[#{삭제 성공}]]" });
+				        		this.search();
+							}.bind(this), true);
+				        }.bind(this)).catch(function () {
+				        	this.mainVue.$message({ type: 'info', message: "[[#{삭제 취소}]]" });
+				        }.bind(this));
+				},
+				// 저장
+				save: function () {
+					this.formError = this.initFormError();
+					
+					for (var i = 0, len = this.inputForm.stuffInfos.length; i < len; i++) {
+						this.formError['stuffInfos[' + i + '].stuffInfoNm'] = '';
+						this.formError['stuffInfos[' + i + '].stuffInfoNation'] = '';
+					}
+					
+					if ('I' === this.inputForm.statu) {
+						this.mainVue.$axios.add(this.url, this.inputForm, this.formError, function (result) {
+							this.mainVue.$message({ type: 'success', message: "[[#{등록 성공}]]" });
+							this.dialogFormVisible = false;
+							this.search();
+						}.bind(this), true);
+					} else {
+						this.mainVue.$axios.up(this.url + "/" + this.inputForm.stuffCd, this.inputForm, this.formError, function (result) {
+							this.mainVue.$message({ type: 'success', message: "[[#{수정 성공}]]" });
+							this.dialogFormVisible = false;
+							this.search();
+						}.bind(this), true);
+					}
+				},
+				searchDictionary: function () {
+					this.mainVue.$axios.search("/dictionary/search", { nm: this.searchText, dictionaryTpVal: "stuff" }, function (result) {
+						this.popTableData = [];
+						
+						for (var i = 0, len = result.length; i < len; i++) {
+							var tmp = result[i];
+							
+							tmp[result[i].lan.id] = result[i].nm;
+							
+							for (var j = 0, jlen = result[i].dictionarys.length; j < jlen; j++) {
+								tmp[result[i].dictionarys[j].lan.id] = result[i].dictionarys[j].nm;
+							}
+							
+							this.popTableData.push(tmp);
+						}
+					}.bind(this), true);
+				},
+				// 키워드 데이타 선택
+				selectDictionary: function (row) {
+					for (var i = 0, len = this.lans.length; i < len; i++) {
+						// 기본 언어 새팅
+						if (0 == i) {
+							if ('nm' == this.dictionaryTp) {
+								this.inputForm.stuffNm = row[this.lans[i].id];	
+							} else {
+								this.inputForm.stuffNation = row[this.lans[i].id];
+							}
+						} else {
+							// 타언어 순서대로 등록
+							if ('nm' == this.dictionaryTp) {
+								this.inputForm.stuffInfos[i-1].stuffInfoNm = row[this.lans[i].id];
+							} else {
+								this.inputForm.stuffInfos[i-1].stuffInfoNation = row[this.lans[i].id];
+							}
+						}
+					}
+					
+					this.dictionaryDialogFormVisible = false;
+				},
+				// 양식 다운로드
+				downExcel: function () {
+					location.href = this.url + '/down';
+				},
+				upSuccess: function () {
+					this.mainVue.$message({ type: 'success', message: "[[#{업로드 되었습니다}]]" });
+					this.search();
+				},
+				upError: function () {
+					this.mainVue.$message({ type: 'error', message: "[[#{업로드 실패 하였습니다}]]" });
+				}
+		    }
+		});
+	/*]]>*/
+	</script>
+</body>
+</html>

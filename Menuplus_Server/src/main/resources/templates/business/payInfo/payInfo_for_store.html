@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:include="main/import :: head"></head>
+<body>
+	<div id="app" class="contain">
+		
+		<div class="search_form" ref="search_form">
+			<el-form :inline="true" :model="inputForm" label-width="110px" label-suffix=":" :size="size" @submit.native.prevent>
+				<el-row>
+				
+					<el-col :span="6">
+						<el-form-item th:label="#{MID}">
+							<el-input v-model="inputForm.mid" clearable="true"></el-input>
+						</el-form-item>
+					</el-col>
+					
+					
+					<el-col :span="6">
+						<el-form-item th:label="#{MIKEY}">
+							<el-input v-model="inputForm.mkey" clearable="true"></el-input>
+						</el-form-item>
+					</el-col>
+					
+					<el-col :span="6">
+						<el-form-item th:label="#{해외MID}">
+							<el-input v-model="inputForm.overseasMid" clearable="true"></el-input>
+						</el-form-item>
+					</el-col>
+					
+					
+					<el-col :span="6">
+						<el-form-item th:label="#{해외MIKEY}">
+							<el-input v-model="inputForm.overseasMkey" clearable="true"></el-input>
+						</el-form-item>
+					</el-col>
+					
+					<el-col :span="12">
+						<el-form-item th:label="#{결제방법}">
+							<paymethod-combo :data="payMethod" :model="inputForm.payMethods" @change="inputForm.payMethods = $event" style="width: 400px;"></paymethod-combo>
+						</el-form-item>
+					</el-col>
+					
+					<el-col :span="6">
+						<el-form-item th:label="#{해외결제통화}">
+							<combo :data="mainVue.code.currency" :model="inputForm.currency" @change="inputForm.currency = $event"></combo>
+						</el-form-item>
+					</el-col>
+					
+					
+				</el-row>
+			</el-form>
+		</div>
+		
+		<!-- 버튼 -->
+		<div class="buttons" ref="buttons">
+			<el-button :size="size" th:text="#{저장}" @click="save" icon="el-icon-circle-plus-outline" :disabled="btn.addDisabled" ></el-button>
+		</div>
+		
+		
+	
+    <script type="text/javascript">
+	/*<![CDATA[*/
+		new Vue({
+			el: '#app',
+			data: function () {
+				var data = parent.mainVue.initData();
+				
+				data.payMethod = [];				
+				data.inputForm = this.initInputForm();
+				
+				return data;
+			},
+			created: function () {
+				this.initPayMethod();
+				this.getPayMethod4Cust();
+			},
+			
+			mounted: function () {
+				setTimeout(function () {
+					this.$nextTick(function () {
+						this.mainVue.currVue = this;
+					}.bind(this));
+				}.bind(this), 500);
+			},
+		
+			methods: {
+				
+				// 입력폼 초기화
+				initInputForm: function () {
+					return {
+						mid: ''
+						,mkey:''
+						,overseasMid:''
+						,overseasMkey:''
+						,payMethod: null
+						,payMethods: []
+						,custCd: 0
+						,currency:'KRW'
+						,methods:''
+					}
+				},
+
+				getPayMethod4Cust: function () {
+					this.mainVue.$axios.search('/cust/payMethod', null, function (result) {
+						this.inputForm = this.initInputForm();
+						this.inputForm.mid = result.mid;
+						this.inputForm.mkey = result.mkey;
+						this.inputForm.overseasMid = result.overseasMid;
+						this.inputForm.overseasMkey = result.overseasMkey;
+						this.inputForm.custCd = result.custCd;
+						this.inputForm.methods = result.methods;
+						this.inputForm.currency = result.currency;
+						
+						if(null!=result.methods && ''!=result.methods ){
+							this.inputForm.payMethods = result.methods.split(',');
+							
+						}						
+						
+					}.bind(this));
+				},
+				
+				// 결제 방법 데이타 초기화
+				initPayMethod: function () {
+					this.mainVue.$axios.search("/code/getCode/PAY_METHOD", null, function (result) {
+						this.payMethod = result;						
+					}.bind(this));
+				},
+				
+				// 저장
+				save: function () {			
+					
+					console.log("this.inputForm.payMethods:" + this.inputForm.payMethods);
+					console.log("this.inputForm.payMethods.length:" + this.inputForm.payMethods.length);
+					
+					var tempPayMethods = '';
+					
+					if(null!=this.inputForm.payMethods && this.inputForm.payMethods.length > 0){
+						for(var i = 0, len = this.inputForm.payMethods.length; i < len; i++){
+							tempPayMethods = tempPayMethods + "," + this.inputForm.payMethods[i];
+						}
+					}
+					
+					this.inputForm.methods = tempPayMethods.substring(1);
+					
+					console.log("===================this.inputForm.methods:" + this.inputForm.methods);
+					
+					this.mainVue.$axios.add('/cust/payMethod', this.inputForm, null, function (result) {
+						this.mainVue.$message({ type: 'success', message: "[[#{등록 성공}]]" });
+						this.getPayMethod4Cust();
+					}.bind(this), true);
+					
+				}
+				
+		    }
+		});
+	/*]]>*/
+	</script>
+</body>
+</html>

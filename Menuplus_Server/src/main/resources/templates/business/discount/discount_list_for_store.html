@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:include="main/import :: head"></head>
+<body>
+	<div id="app" class="contain">
+		<!-- 검색 영역 -->
+		<div class="search_form" ref="search_form">
+			<el-form :inline="true" :model="searchForm" label-width="120px" label-suffix=":" :size="size" @submit.native.prevent>
+				<el-row>
+					<el-col :span="6">
+						<el-form-item th:label="#{할인명}">
+							<el-input v-model="searchForm.discountNm" @keyup.enter.native="search" clearable="true"></el-input>
+						</el-form-item>
+					</el-col>
+					<el-col :span="6">
+						<el-form-item th:label="#{사용 가능 여부 }">
+							<combo :data="mainVue.code.useYn" th:label="#{전체}" :model="searchForm.useYn" @change="searchForm.useYn = $event"></combo>
+						</el-form-item>
+					</el-col>
+				</el-row>
+			</el-form>
+		</div>
+		
+		<!-- 버튼 -->
+		<div class="buttons" ref="buttons">
+			<el-button th:if='${sa_actions.contains("DiscountForStoreSearch")}' :size="size" th:text="#{검색}" @click="search" icon="el-icon-search" ></el-button>
+			<el-button th:if='${sa_actions.contains("DiscountForStoreAdd")}' :size="size" th:text="#{등록}" @click="add" icon="el-icon-circle-plus-outline" :disabled="btn.addDisabled" ></el-button>
+			<el-button th:if='${sa_actions.contains("DiscountForStoreUp")}' :size="size" th:text="#{수정}" @click="up" icon="el-icon-edit-outline" :disabled="btn.upDisabled" ></el-button>
+			<el-button th:if='${sa_actions.contains("DiscountForStoreDel")}' :size="size" th:text="#{삭제}" @click="del" icon="el-icon-remove-outline" :disabled="btn.delDisabled" ></el-button>
+		</div>
+		
+		<!-- 리스트 -->
+		<el-table :height="tableHeight" border stripe highlight-current-row tooltip-effect="dark"
+				:data="tableData" :size="size" th:empty-text="#{데이타 없음}"
+				@row-click="handleRowClick" @select="handleRowChecked" @select-all="handleRowChecked">
+			<el-table-column :label="tableData.length" type="index" 	width="55" align="center" sortable label-class-name="data_cnt"></el-table-column>
+			<el-table-column type="selection" 							width="45" align="center"></el-table-column>
+			<el-table-column th:label="#{할인명}" 		prop="discountNmLan" 	min-width="200" sortable></el-table-column>
+			<el-table-column th:label="#{할인 대상 구분}" 	prop="discountTarget.nmLan" 	min-width="130" align="center" sortable></el-table-column>
+			<el-table-column th:label="#{판매 방식}" 		prop="salesTpNms"	min-width="150" align="center" show-overflow-tooltip></el-table-column>
+			<el-table-column th:label="#{할인 유형}" 		prop="discountTp.nmLan"	min-width="130" align="center" sortable></el-table-column>
+			<el-table-column th:label="#{할인 금액/율}" 	prop="tmp" 	min-width="130" align="right" sortable></el-table-column>
+			<el-table-column th:label="#{표시 순서}" 		prop="ord" 		min-width="100" align="center" sortable></el-table-column>
+			<el-table-column th:label="#{사용 가능 여부}" 	prop="useYn" 	min-width="110" align="center" :formatter="mainVue.formatterCode"></el-table-column>
+			<el-table-column th:label="#{설명}" 			prop="discountDesc" min-width="300" show-overflow-tooltip></el-table-column>
+		</el-table>
+		
+		<!-- 입력 팝업 -->
+		<el-dialog :title="inputForm.title" :visible.sync="dialogFormVisible" width="500px">
+			<el-form :model="inputForm" label-width="120px" label-suffix=":" :size="size" @submit.native.prevent>
+				<el-row :gutter="20">
+					<el-col :span="inputForm.discountInfos.length > 0 ? 12 : 24">
+						<el-tabs value="info">
+							<el-tab-pane th:label="#{기본 정보}" name="info">
+								<el-row :gutter="20">
+									<el-col :span="inputForm.discountInfos.length > 0 ? 24 : 24">
+										<el-form-item th:label="#{할인명}" :error="formError.discountNm" required>
+											<el-input v-model="inputForm.discountNm" maxlength="50" clearable="true" show-word-limit>
+												<el-button v-if="lans.length > 1" slot="append" :size="size" th:text="#{다국어 조회}" @click="dictionaryDialogFormVisible = true" icon="el-icon-search"></el-button>
+											</el-input>
+											
+											<!-- 사전 선택 -->
+											<el-dialog th:title="#{다국어 사전}" :visible.sync="dictionaryDialogFormVisible" width="900px" append-to-body>
+												<div class="search_form" style="margin-bottom: 10px;">
+													<el-form :inline="true" label-width="60px" label-suffix=":" :size="size" @submit.native.prevent>
+														<el-form-item th:label="#{언어}">
+															<el-input v-model="searchText" @keyup.enter.native="searchDictionary" clearable="true" style="width: 190%;">
+																<el-button slot="append" :size="size" th:text="#{검색}" @click="searchDictionary" icon="el-icon-search"></el-button>
+															</el-input>
+														</el-form-item>
+													</el-form>
+												</div>
+									
+												<el-table :height="tableHeight/2" border stripe highlight-current-row tooltip-effect="dark"
+														:data="popTableData" :size="size" th:empty-text="#{언어 코드}">
+									      
+													<el-table-column fixed>
+														<template slot-scope="scope">
+															<el-button :size="size" th:text="#{선택}" @click="selectDictionary(scope.row)"></el-button>
+														</template>
+													</el-table-column>
+									
+													<el-table-column th:label="#{언어 코드}" prop="id" min-width="200" sortable show-overflow-tooltip></el-table-column>
+													<el-table-column v-for="item in lans" :label="item.nm" :prop="item.id" min-width="200" sortable show-overflow-tooltip></el-table-column>
+												</el-table>
+									
+											</el-dialog>
+										</el-form-item>
+										<el-form-item th:label="#{할인 대상}" :error="formError['discountTarget.cd']" required>
+											<code-combo :data="discountTarget" :model="inputForm.discountTarget" @change="inputForm.discountTarget = $event"></code-combo>
+										</el-form-item>
+										<el-form-item th:label="#{할인 구분}" :error="formError['discountTp.cd']" required>
+											<code-combo :data="discountTp" :model="inputForm.discountTp" @change="inputForm.discountTp = $event"></code-combo>
+										</el-form-item>
+										<el-form-item th:label="#{할인 금액}" :error="formError.price" required v-show="inputForm.discountTp.val == 'price'">
+											<el-input-number v-model="inputForm.price" step="100" :min="0" :max="90000000" style="width: 200px;"></el-input-number>
+										</el-form-item>
+										<el-form-item th:label="#{할인율}" :error="formError.percente" required v-show="inputForm.discountTp.val == 'percent'">
+											<el-input-number v-model="inputForm.percente" :min="0" :max="100" style="width: 200px;"></el-input-number>
+										</el-form-item>
+										<el-form-item th:label="#{표시 순서}" :error="formError.ord" required>
+											<el-input-number v-model="inputForm.ord" :min="1" :max="99"></el-input-number>
+										</el-form-item>
+										<el-form-item th:label="#{사용 가능 여부}" required>
+											<combo :data="mainVue.code.useYn" :model="inputForm.useYn" @change="inputForm.useYn = $event"></combo>
+										</el-form-item>
+										
+										<el-form-item th:label="#{설명}" :error="formError.discountDesc">
+											<el-input v-model="inputForm.discountDesc" type="textarea" maxlength="250" show-word-limit></el-input>
+										</el-form-item>
+									</el-col>
+								</el-row>
+							</el-tab-pane>
+						</el-tabs>
+					</el-col>
+					<el-col :span="12" v-if="inputForm.discountInfos.length > 0">
+						<el-tabs v-model="activiTab">
+							<el-tab-pane v-for="(item, index) in inputForm.discountInfos" :key="item.lanTp.id" :label="item.lanTp.nm" :name="item.lanTp.id">
+								<el-form-item th:label="#{할인명}" :error="formError['discountInfos[' + index + '].discountInfoNm']" required>
+									<el-input v-model="inputForm.discountInfos[index].discountInfoNm" maxlength="50" clearable="true" show-word-limit></el-input>
+								</el-form-item>
+								
+								<el-form-item th:label="#{할인 금액}" :error="formError['discountInfos[' + index + '].price']" required
+										v-show="inputForm.discountTp.val == 'price'" v-if="internationalPayYn">
+									<el-input-number v-model="inputForm.discountInfos[index].price" :min="0" :max="90000000" style="width: 200px;"></el-input-number>
+								</el-form-item>
+								
+								<el-form-item th:label="#{할인율}" :error="formError['discountInfos[' + index + '].percente']" required
+										v-show="inputForm.discountTp.val == 'percent'" v-if="internationalPayYn">
+									<el-input-number v-model="inputForm.discountInfos[index].percente" :min="0" :max="100" style="width: 200px;"></el-input-number>
+								</el-form-item>
+							</el-tab-pane>
+						</el-tabs>
+					</el-col>
+				</el-row>
+			</el-form>
+			<div slot="footer" class="dialog-footer">
+				<el-button th:text="#{저장}" icon="el-icon-check" :size="size" @click="save" :disabled="btn.saveDisabled"></el-button>
+				<el-button th:text="#{닫기}" icon="el-icon-close" :size="size" @click="dialogFormVisible = false"></el-button>
+			</div>
+		</el-dialog>
+	</div>
+	
+    <script type="text/javascript">
+	/*<![CDATA[*/
+		new Vue({
+			el: '#app',
+			data: function () {
+				var data = parent.mainVue.initData();
+				data.url = '/discount/store';
+				data.storeLans = [];
+				data.discountTarget = [];
+				data.salesTp = [];
+				data.discountTp = [];
+				data.activiTab = '';
+				
+				data.searchForm = this.initSearchForm();
+				data.inputForm = this.initInputForm();
+				data.formError = this.initFormError();
+				
+				
+				data.lans = [];
+				data.popTableData = [];
+				
+				data.dictionaryDialogFormVisible = false;
+				data.searchText = '';
+				
+				data.internationalPayYn = false;
+				
+				return data;
+			},
+			created: function () {
+				this.initStore();
+				this.initDiscountTarget();
+				this.initSalesTp();
+				this.initDiscountTp();
+				this.search();
+			},
+			mounted: function () {
+				setTimeout(function () {
+					this.$nextTick(function () {
+						this.mainVue.currVue = this;
+					}.bind(this));
+				}.bind(this), 500);
+			},
+			watch: {
+				formError: {
+					deep: true,
+					handler: function (newVal, oldVal) {
+						// 벨리데이션 메세지가 값은 있는데 Vue에서 표시 안해주는 현상 처리 하기 위함
+						setTimeout(function () {
+							var tmp = this.inputForm.discountNm;
+							this.inputForm.discountNm = this.inputForm.discountNm + ' ';
+							this.inputForm.discountNm = tmp;
+							
+							var i = 100;
+							for (val in newVal) {
+								if (val.indexOf('discountInfos') > -1) {
+									if ('' != newVal[val]) {
+										if (i > val.replace(/[^0-9]*/g,"")) {
+											i = parseInt(val.replace(/[^0-9]*/g,""));
+										}
+									}
+								}
+							}
+							
+							if (100 != i) {
+								this.activiTab = this.inputForm.discountInfos[i].lanTp.id;	
+							}
+						}.bind(this), 500);
+					}
+				},
+				// 단가 수정 이벤트 감지
+				'inputForm.price': function (newVal) {
+					// 타국화페 결제 사용안할때
+					if (!this.internationalPayYn) {
+						for(var i = 0, len = this.inputForm.discountInfos; i < len; i++) {
+							this.inputForm.discountInfos[i].price = this.inputForm.price;
+						}
+					}
+				},
+				// 할인율 수정 이벤트 감지
+				'inputForm.percente': function (newVal) {
+					// 타국화페 결제 사용안할때
+					if (!this.internationalPayYn) {
+						for(var i = 0, len = this.inputForm.discountInfos; i < len; i++) {
+							this.inputForm.discountInfos[i].percente = this.inputForm.percente;
+						}
+					}
+				}
+			},
+			methods: {
+				// 검색 조건 초기화
+				initSearchForm: function () {
+					return {
+						discountNm: '',
+						useYn: 'Y'
+					}
+				},
+				// 입력폼 초기화
+				initInputForm: function () {
+					return {
+						statu: "I",
+						title: '',
+						discountCd: 0,
+						discountNm: '',
+						price: 0,
+						percente: 0,
+						discountInfos: [],
+						discountTarget: { cd: null, nm: '' },
+						salesTps: [],
+						discountTp: { cd: null, nm: '' },
+						ord: 0,
+						useYn: 'Y',
+						discountDesc: ''
+					}
+				},
+				// 오류 메세지 초기화
+				initFormError: function () {
+					return {
+						discountNm: '',
+						price: '',
+						percente: '',
+						'discountTarget.cd': '',
+						salesTps: '',
+						'discountTp.cd': '',
+						ord: '',
+						useYn: '',
+						discountDesc: ''
+					}
+				},
+				// 그리드 선택 이벤트
+				handleRowClick: function (val) {
+					if (null != val) {
+						this.btn.upDisabled = false;
+					}
+					this.selectData = val;
+				},
+				// 체크 박스 체크 이벤트
+				handleRowChecked: function (selection, row) {
+					if (selection.length > 0) {
+						this.btn.delDisabled = false;	
+					} else {
+						this.btn.delDisabled = true;
+					}
+					
+					this.checkedData = [];
+					
+					for (var i = 0, len = selection.length; i < len; i++) {
+						this.checkedData[this.checkedData.length] = selection[i].discountCd;
+					}
+				},
+				initStore: function () {
+					this.mainVue.$axios.search('/store/getStore', null, function (result) {
+						this.storeLans = result.lans;
+						this.internationalPayYn = result.internationalPayYn;
+						this.initStoreLans(result);
+					}.bind(this));
+				},
+				// 사전 조회를 위한 언어 정보 설정
+				initStoreLans: function (store) {
+					this.lans = [];
+					this.lans.push(store.defaultLan);
+					
+					for (var i = 0, len = store.lans.length; i < len; i++) {
+						this.lans.push(store.lans[i]);
+					}
+				},
+				// 할인 대상 조회
+				initDiscountTarget: function (storeCd) {
+					this.mainVue.$axios.search("/code/getCode/DISCOUNT_TARGET", null, function (result) {
+						this.discountTarget = result;
+					}.bind(this), false);
+				},
+				// 판매 방식 데이타 초기화
+				initSalesTp: function () {
+					this.mainVue.$axios.search("/code/getCode/SALES_TP", null, function (result) {
+						this.salesTp = result;
+					}.bind(this), false);
+				},
+				// 할인 구분 조회
+				initDiscountTp: function (storeCd) {
+					this.mainVue.$axios.search("/code/getCode/DISCOUNT_TP", null, function (result) {
+						this.discountTp = result;
+					}.bind(this), false);
+				},
+				// 추가
+				add: function () {
+					this.inputForm = this.initInputForm();
+					this.inputForm.title = '[[#{할인 추가}]]';
+					
+					this.formError = this.initFormError();
+					
+					if (this.storeLans.length > 0) {
+						this.inputForm.discountInfos = [];
+						
+						for (var i = 0, len = this.storeLans.length; i < len; i++) {
+							this.formError['discountInfos[' + i + '].discountInfoNm'] = '';
+							this.formError['discountInfos[' + i + '].price'] = '';
+							this.formError['discountInfos[' + i + '].percente'] = '';
+							
+	 						this.inputForm.discountInfos.push({
+	 							lanTp: this.storeLans[i],
+	 							discountInfoNm: '',
+	 							price: 0,
+	 							percente: 0
+	 						});
+							
+	 						if (i === 0) {
+	 							this.activiTab = this.storeLans[i].id;
+	 						}
+						}
+					}
+					
+					this.inputForm.discountTarget = this.discountTarget.length > 0 ? util.copyObj(this.discountTarget[0]) : { cd: null, nm: '' };
+					this.inputForm.salesTps = this.salesTp.length > 0 ? util.copyObj(this.salesTp) : [];
+					this.inputForm.discountTp = this.discountTp.length > 0 ? util.copyObj(this.discountTp[0]) : { cd: null, nm: '' };
+					
+					// 순번 자동으로 검색된 내용중 제일 마지막으로 설정
+					for (var i = 0, len = this.tableData.length; i < len; i++) {
+						if (this.inputForm.ord < this.tableData[i].ord) {
+							this.inputForm.ord = this.tableData[i].ord;
+						}
+					}
+					
+					this.inputForm.ord++;
+					
+					this.dialogFormVisible = true;
+					this.btn.saveDisabled = false;
+				},
+				// 수정
+				up: function () {
+					this.mainVue.$axios.get(this.url + '/' + this.selectData.discountCd, function (result) {
+						result.statu = "U";
+						result.title = "[[#{할인 수정}]]";
+						
+						this.formError = this.initFormError();
+						
+						this.inputForm = result;
+						
+						// 수정 시 매장 다국어 삭제 시 카테고리도 다국어 지워줌
+						var discountInfosTmp = [];
+						
+						if (this.inputForm.statu == "U") {
+							discountInfosTmp = util.copyObj(this.inputForm.discountInfos);	
+						}
+						
+						this.inputForm.discountInfos = [];
+						
+						for (var i = 0, len = this.storeLans.length; i < len; i++) {
+							this.formError['discountInfos[' + i + '].discountInfoNm'] = '';
+							this.formError['discountInfos[' + i + '].price'] = '';
+							this.formError['discountInfos[' + i + '].percente'] = '';
+							
+							var discountInfoNm = '';
+							var price = 0;
+							var percente = 0;
+							
+							if (this.inputForm.statu == "U") {
+								for (var k = 0, klen = discountInfosTmp.length; k < klen; k++) {
+									if (discountInfosTmp[k].lanTp.id == this.storeLans[i].id) {
+										discountInfoNm = discountInfosTmp[k].discountInfoNm;
+										price = discountInfosTmp[k].price;
+										percente = discountInfosTmp[k].percente;
+									}
+								}
+							}
+							
+	 						this.inputForm.discountInfos.push({
+	 							lanTp: this.storeLans[i],
+	 							discountInfoNm: discountInfoNm,
+	 							price: price,
+	 							percente: percente
+	 						});
+							
+	 						if (i === 0) {
+	 							this.activiTab = this.storeLans[i].id;
+	 						}
+						}
+						
+						this.dialogFormVisible = true;
+						this.btn.saveDisabled = false;
+					}.bind(this), true);
+				},
+				// 조회
+				search: function () {
+					this.mainVue.$axios.search(this.url, this.searchForm, function (result) {
+						for (var i = 0, len = result.length; i < len; i++) {
+							if (result[i].discountTp.val == 'price') {
+								result[i].tmp = this.mainVue.formatterNum(null, null, result[i].priceLan);
+							} else {
+								result[i].tmp = this.mainVue.formatterPercent(null, null, result[i].percenteLan);
+							}
+						}
+						
+						this.tableData = result;
+						
+						this.btn.addDisabled = false;
+						this.btn.upDisabled = true;
+						this.btn.delDisabled = true;
+						
+						this.inputForm = this.initInputForm();
+						this.formError = this.initFormError();
+					}.bind(this), false);
+				},
+				// 삭제
+				del: function () {
+					this.mainVue.$confirm("[[#{{0}를 삭제 하시겠습니까?(#{할인 정보})}]]", this.mainVue.appMsg.systemAlterTitle, {
+				          confirmButtonText: "[[#{삭제}]]",
+				          cancelButtonText: "[[#{취소}]]",
+				          type: 'info'
+				        }).then(function () {
+				        	this.mainVue.$axios.del(this.url + "/" + this.checkedData.join(","), function (result) {
+				        		this.mainVue.$message({ type: 'success', message: "[[#{삭제 성공}]]" });
+				        		this.search();
+							}.bind(this), true);
+				        }.bind(this)).catch(function () {
+				        	this.mainVue.$message({ type: 'info', message: "[[#{삭제 취소}]]" });
+				        }.bind(this));
+				},
+				// 저장
+				save: function () {
+					this.formError = this.initFormError();
+					
+					for (var i = 0, len = this.inputForm.discountInfos.length; i < len; i++) {
+						this.formError['discountInfos[' + i + '].discountInfoNm'] = '';
+						this.formError['discountInfos[' + i + '].price'] = '';
+						this.formError['discountInfos[' + i + '].percente'] = '';
+					}
+					
+					if ('I' === this.inputForm.statu) {
+						this.mainVue.$axios.add(this.url, this.inputForm, this.formError, function (result) {
+							this.mainVue.$message({ type: 'success', message: "[[#{등록 성공}]]" });
+							this.dialogFormVisible = false;
+							this.search();
+						}.bind(this), true);
+					} else {
+						this.mainVue.$axios.up(this.url + "/" + this.inputForm.discountCd, this.inputForm, this.formError, function (result) {
+							this.mainVue.$message({ type: 'success', message: "[[#{수정 성공}]]" });
+							this.dialogFormVisible = false;
+							this.search();
+						}.bind(this), true);
+					}
+				},
+				searchDictionary: function () {
+					this.mainVue.$axios.search("/dictionary/search", { nm: this.searchText, dictionaryTpVal: "discount" }, function (result) {
+						this.popTableData = [];
+						
+						for (var i = 0, len = result.length; i < len; i++) {
+							var tmp = result[i];
+							
+							tmp[result[i].lan.id] = result[i].nm;
+							
+							for (var j = 0, jlen = result[i].dictionarys.length; j < jlen; j++) {
+								tmp[result[i].dictionarys[j].lan.id] = result[i].dictionarys[j].nm;
+							}
+							
+							this.popTableData.push(tmp);
+						}
+					}.bind(this), true);
+				},
+				// 키워드 데이타 선택
+				selectDictionary: function (row) {
+					for (var i = 0, len = this.lans.length; i < len; i++) {
+						// 기본 언어 새팅
+						if (0 == i) {
+							this.inputForm.discountNm = row[this.lans[i].id];
+						} else {
+							// 타언어 순서대로 등록
+							this.inputForm.discountInfos[i-1].discountInfoNm = row[this.lans[i].id];
+						}
+					}
+					
+					this.dictionaryDialogFormVisible = false;
+				}
+		    }
+		});
+	/*]]>*/
+	</script>
+</body>
+</html>

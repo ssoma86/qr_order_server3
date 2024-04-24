@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:include="main/import :: head"></head>
+<body>
+	<script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
+	
+	<style type="text/css">
+		.el-upload-list__item {
+			-webkit-transition: none;
+			transition: none;
+		}
+		
+		.file_name .el-textarea__inner {
+			height: 90px;
+		}
+	</style>
+	<div id="app" class="contain">
+		<!-- 검색 영역 -->
+		<div class="search_form" ref="search_form">
+			<el-form :inline="true" :model="searchForm" label-width="120px" label-suffix=":" :size="size" @submit.native.prevent>
+				<el-row>
+					<el-col :span="6">
+						<el-form-item th:label="#{소속 사업장}">
+							<el-select v-model="searchForm.topCustCd" filterable remote default-first-option clearable="true"
+									th:placeholder="#{사업장명을 입력 하여 검색}" :remote-method="custSearch">
+								<el-option v-for="item in cust" :key="item.custCd" :label="item.custNm" :value = "item.custCd"></el-option>
+							</el-select>
+						</el-form-item>
+					</el-col>
+					<el-col :span="6">
+						<el-form-item th:label="#{사업장명}">
+							<el-input v-model="searchForm.custNm" @keyup.enter.native="search" clearable="true"></el-input>
+						</el-form-item>
+					</el-col>
+					<el-col :span="6">
+						<el-form-item th:label="#{사용 가능 여부}">
+							<combo :data="mainVue.code.useYn" th:label="#{전체}" :model="searchForm.useYn" @change="searchForm.useYn = $event"></combo>
+						</el-form-item>
+					</el-col>
+				</el-row>
+			</el-form>
+		</div>
+		
+		<!-- 버튼 -->
+		<div class="buttons" ref="buttons">
+			<el-button th:if='${sa_actions.contains("CustSearch")}' :size="size" th:text="#{검색}" @click="search" icon="el-icon-search" ></el-button>
+			<el-button th:if='${sa_actions.contains("CustAdd")}' :size="size" th:text="#{등록}" @click="add" icon="el-icon-circle-plus-outline" :disabled="btn.addDisabled" ></el-button>
+			<el-button th:if='${sa_actions.contains("CustUp")}' :size="size" th:text="#{수정}" @click="up" icon="el-icon-edit-outline" :disabled="btn.upDisabled" ></el-button>
+			<el-button th:if='${sa_actions.contains("CustDel")}' :size="size" th:text="#{삭제}" @click="del" icon="el-icon-remove-outline" :disabled="btn.delDisabled" ></el-button>
+		</div>
+		
+		<!-- 리스트 -->
+		<el-table :height="tableHeight" border stripe highlight-current-row tooltip-effect="dark"
+				:data="tableData" :size="size" th:empty-text="#{데이타 없음}"
+				@row-click="handleRowClick" @select="handleRowChecked" @select-all="handleRowChecked">
+			<el-table-column :label="tableData.length" type="index" 	width="55" align="center" sortable fixed label-class-name="data_cnt"></el-table-column>
+			<el-table-column type="selection" 							width="45" align="center" fixed></el-table-column>
+			<el-table-column th:label="#{사업장 코드}" 	prop="custId" 	width="90" align="center" fixed></el-table-column>
+			<el-table-column th:label="#{사업장명}" 	prop="custNm" 	min-width="200" fixed sortable show-overflow-tooltip></el-table-column>
+			<el-table-column th:label="#{소속 사업장명}" 	prop="topCust.custNm" 	min-width="200" sortable show-overflow-tooltip></el-table-column>
+			<el-table-column th:label="#{사업자 등록 번호}" prop="busiNum" 	min-width="140" align="center" sortable show-overflow-tooltip></el-table-column>
+			<el-table-column th:label="#{핸드폰 번호}" 	prop="tel" 			min-width="130" align="center" sortable show-overflow-tooltip></el-table-column>
+			<el-table-column th:label="#{팩스 번호}" 	prop="fax" 			min-width="130" align="center" sortable show-overflow-tooltip></el-table-column>
+			<el-table-column th:label="#{대표자명}" 	prop="ceoNm" 		min-width="100" align="center" sortable show-overflow-tooltip></el-table-column>
+			<el-table-column th:label="#{가입일}" 	prop="startDt" 		min-width="100" align="center" sortable show-overflow-tooltip></el-table-column>
+			<el-table-column th:label="#{탈퇴일}" 	prop="endDt" 		min-width="100" align="center" sortable show-overflow-tooltip></el-table-column>
+			<el-table-column th:label="#{정산계좌번호}" prop="accountNumber" 	min-width="120" align="center" sortable show-overflow-tooltip></el-table-column>
+			<el-table-column th:label="#{정산은행}" 	prop="bankTp.nmLan" 	min-width="100" align="center" sortable show-overflow-tooltip></el-table-column>
+			<el-table-column th:label="#{예금주명}" 	prop="accountName" 		min-width="100" align="center" sortable show-overflow-tooltip></el-table-column>
+			<el-table-column th:label="#{사용 가능 여부}" prop="useYn" 		min-width="110" align="center" :formatter="mainVue.formatterCode"></el-table-column>
+			<el-table-column th:label="#{우편 번호}" 	prop="zipCd" 		min-width="80" align="center"></el-table-column>
+			<el-table-column th:label="#{주소}" 		prop="addr" 		min-width="300" show-overflow-tooltip></el-table-column>
+			<el-table-column th:label="#{상세 주소}" 	prop="addrDtl" 		min-width="150" show-overflow-tooltip></el-table-column>
+			<el-table-column th:label="#{설명}" 		prop="custDesc" 	min-width="300" show-overflow-tooltip></el-table-column>
+		</el-table>
+		
+		<!-- 입력 팝업 -->
+		<el-dialog :title="inputForm.title" :visible.sync="dialogFormVisible" fullscreen>
+			<el-form :model="inputForm" label-width="180px" label-suffix=":" :size="size" @submit.native.prevent>
+				<el-row v-if="'I' === inputForm.statu || null != inputForm.topCust.custCd">
+					<el-col :span="12">
+						<el-form-item th:label="#{소속 사업장}" :error="formError['topCust.custCd']">
+							<el-select v-model="inputForm.topCust.custCd" filterable remote default-first-option style="width: 100%;"
+									th:placeholder="#{사업장명을 입력 하여 검색}" :remote-method="custSearch" v-if="'I' === inputForm.statu">
+								<el-option v-for="item in cust" :key="item.custCd" :label="item.custNm" :value = "item.custCd"></el-option>
+							</el-select>
+							<span class="show_cd">{{ inputForm.topCust.custNm }}</span>
+						</el-form-item>
+					</el-col>
+				</el-row>
+				<el-row>
+					<el-col :span="12">
+						<el-form-item th:label="#{사업장명}" :error="formError.custNm" required>
+							<el-input v-model="inputForm.custNm" maxlength="50" clearable="true" show-word-limit></el-input>
+						</el-form-item>
+					</el-col>
+					<el-col :span="12">
+						<el-form-item th:label="#{사업자 등록 번호}" :error="formError.busiNum">
+							<el-input v-model="inputForm.busiNum" maxlength="20" clearable="true" show-word-limit  @keyup.native="inputForm.busiNum = util.inputBusiNumNew($event)"></el-input>
+						</el-form-item>
+					</el-col>
+					<el-col :span="12">
+						<el-form-item th:label="#{대표자명}" :error="formError.ceoNm" required>
+							<el-input v-model="inputForm.ceoNm" maxlength="20" clearable="true" show-word-limit></el-input>
+						</el-form-item>
+					</el-col>
+					<el-col :span="12">
+						<el-form-item th:label="#{사용 가능 여부}" required>
+							<combo :data="mainVue.code.useYn" :model="inputForm.useYn" @change="inputForm.useYn = $event"></combo>
+						</el-form-item>
+					</el-col>
+					<el-col :span="12">
+						<el-form-item th:label="#{전화번호}" :error="formError.tel" required>
+							<el-input v-model="inputForm.tel" maxlength="20" clearable="true" show-word-limit @keyup.native="inputForm.tel = util.inputTelNew($event)"></el-input>
+						</el-form-item>
+					</el-col>
+					<el-col :span="12">
+						<el-form-item th:label="#{팩스번호}" :error="formError.fax">
+							<el-input v-model="inputForm.fax" maxlength="20" clearable="true" show-word-limit @keyup.native="inputForm.fax = util.inputTelNew($event)"></el-input>
+						</el-form-item>
+					</el-col>
+				</el-row>
+				<el-row>
+					<el-col :span="12">
+						<el-form-item th:label="#{가입일}" :error="formError.startDt" required>
+							<el-date-picker v-model="inputForm.startDt" type="date" th:placeholder="#{가입일}" value-format="yyyy-MM-dd"></el-date-picker>
+						</el-form-item>
+					</el-col>
+					<el-col :span="12">
+						<el-form-item th:label="#{탈퇴일}" :error="formError.endDt">
+							<el-date-picker v-model="inputForm.endDt" type="date" th:placeholder="#{탈퇴일}" value-format="yyyy-MM-dd"></el-date-picker>
+						</el-form-item>
+					</el-col>
+				</el-row>
+				<el-row>
+					<el-col :span="12">
+						<el-form-item th:label="#{정산은행}" :error="formError['bankTp.cd']">
+							<code-combo :data="bankTp" :model="inputForm.bankTp" @change="inputForm.bankTp = $event"></code-combo>
+						</el-form-item>
+					</el-col>
+				</el-row>
+				<el-row>
+					<el-col :span="12">
+						<el-form-item th:label="#{정산계좌번호}" :error="formError.accountNumber">
+							<el-input v-model="inputForm.accountNumber" maxlength="20" clearable="true" show-word-limit @keyup.native="inputForm.accountNumber = util.inputBusiNumNew($event)"></el-input>
+						</el-form-item>
+					</el-col>
+					<el-col :span="12">
+						<el-form-item th:label="#{예금주명}" :error="formError.accountName">
+							<el-input v-model="inputForm.accountName" maxlength="20" clearable="true" show-word-limit></el-input>
+						</el-form-item>
+					</el-col>
+				</el-row>
+				<el-row>
+					<el-col :span="12">
+						<el-form-item th:label="#{우편 번호}" :error="formError.zipCd" required>
+							<el-input v-model="inputForm.zipCd" maxlength="10" show-word-limit style="width: 200px;" readonly></el-input>
+							<el-button th:text="#{주소 조회}" @click="initDaum"></el-button>
+						</el-form-item>
+					</el-col>
+				</el-row>
+				<el-row>
+					<el-col :span="12">
+						<el-form-item th:label="#{주소}" :error="formError.addr" required>
+							<el-input v-model="inputForm.addr" maxlength="250" show-word-limit readonly></el-input>
+						</el-form-item>
+					</el-col>
+					<el-col :span="12">
+						<el-form-item th:label="#{상세 주소}" :error="formError.addrDtl" required>
+							<el-input ref="addr_dtl" v-model="inputForm.addrDtl" maxlength="50" clearable="true" show-word-limit></el-input>
+						</el-form-item>
+					</el-col>
+				</el-row>
+				<el-row>
+					<el-col :span="24">
+						<el-form-item th:label="#{설명}" :error="formError.custDesc">
+							<el-input v-model="inputForm.custDesc" type="textarea" maxlength="250" show-word-limit></el-input>
+						</el-form-item>
+					</el-col>
+				</el-row>
+				<el-row :gutter="10">
+					<el-col :span="8">
+						<el-form-item th:label="#{첨부 파일}">
+							<el-upload class="avatar-uploader" accept="image/*" :auto-upload="false" :file-list="inputForm.files"
+								:on-change="custFileAdd" :on-remove="custFileRemove" multiple list-type="picture">
+								<el-button slot="trigger" size="small" type="primary" th:text="#{파일 추가}"></el-button>
+							</el-upload>
+						</el-form-item>
+					</el-col>
+					<el-col :span="8">
+						<div style="margin-top: 30px;">&nbsp;</div>
+						<div v-for="(item, index) in inputForm.files" :key="index" class="file_name"
+								style="margin-top: 10px; height: 92px;" v-if="'del' != inputForm.files[index].status">
+							<el-input v-model="inputForm.files[index].name" maxlength="50" show-word-limit :size="size"
+								type="textarea" resize="none" rows="4" @change="fileNameChange(inputForm.files[index])"></el-input>
+						</div>
+					</el-col>
+				</el-row>
+			</el-form>
+			<div slot="footer" class="dialog-footer">
+				<el-button th:text="#{저장}" icon="el-icon-check" :size="size" @click="save" :disabled="btn.saveDisabled"></el-button>
+				<el-button th:text="#{닫기}" icon="el-icon-close" :size="size" @click="dialogFormVisible = false" ></el-button>
+			</div>
+		</el-dialog>
+	</div>
+	
+    <script type="text/javascript">
+	/*<![CDATA[*/
+		Vue.config.devtools = true;
+		new Vue({
+			el: '#app',
+			data: function () {
+				var data = parent.mainVue.initData();
+				data.url = '/cust';
+				data.cust = [];
+				
+				data.bankTp = [];
+				
+				data.searchForm = this.initSearchForm();
+				data.inputForm = this.initInputForm();
+				data.formError = this.initFormError();
+				
+				return data;
+			},
+			created: function () {
+				this.initBankTp();
+				this.custSearch('');
+				this.search();
+			},
+			mounted: function () {
+				setTimeout(function () {
+					this.$nextTick(function () {
+						this.mainVue.currVue = this;
+					}.bind(this));
+				}.bind(this), 500);
+			},
+			watch: {
+				'inputForm.startDt': function (newVal) {
+					if (!util.isEmpty(this.inputForm.startDt) && !util.isEmpty(this.inputForm.endDt)) {
+						if (this.inputForm.startDt > this.inputForm.endDt) {
+							this.formError.startDt = '[[#{가입일은 탈퇴일 이전의 일자만 설정 가능 합니다.}]]';
+							this.inputForm.startDt = this.inputForm.endDt;
+							this.formError.endDt = '';
+						}
+					}
+				},
+				'inputForm.endDt': function (newVal) {
+					if (!util.isEmpty(this.inputForm.startDt) && !util.isEmpty(this.inputForm.endDt)) {
+						if (this.inputForm.startDt > this.inputForm.endDt) {
+							this.formError.endDt = '[[#{탈퇴일은 가입일 이후의 일자만 설정 가능 합니다.}]]';
+							this.formError.startDt = '';
+							this.inputForm.endDt = this.inputForm.startDt;
+						}
+					}
+				}
+			},
+			methods: {
+				// 검색 조건 초기화
+				initSearchForm: function () {
+					return {
+						topCustCd: null,
+						custNm: '',
+						useYn: 'Y'
+					}
+				},
+				// 입력폼 초기화
+				initInputForm: function () {
+					return {
+						statu: "I",
+						title: '',
+						custCd: 0,
+						custNm: '',
+						busiNum: '',
+						ceoNm: '',
+						useYn: 'Y',
+						tel: '',
+						fax: '',
+						zipCd: '',
+						addr: '',
+						addrDtl: '',
+						custDesc: '',
+						topCust: { custCd: null, custNm: '' },
+						files: [],
+						delFiles: [],
+						startDt: util.getNow('yyyy-MM-dd'),
+						endDt: null,
+						accountNumber: '',
+						bankTp: null,
+						accountName: ''
+					}
+				},
+				// 오류 메세지 초기화
+				initFormError: function () {
+					return {
+						custNm: '',
+						busiNum: '',
+						ceoNm: '',
+						tel: '',
+						fax: '',
+						zipCd: '',
+						addr: '',
+						addrDtl: '',
+						custDesc: '',
+						'topCust.custCd': '',
+						startDt: '',
+						endDt: '',
+						accountNumber: '',
+						'bankTp.cd': '',
+						accountName: ''
+					}
+				},
+				// 그리드 선택 이벤트
+				handleRowClick: function (val) {
+					if (null != val) {
+						this.btn.upDisabled = false;
+					}
+					this.selectData = val;
+				},
+				// 체크 박스 체크 이벤트
+				handleRowChecked: function (selection, row) {
+					if (selection.length > 0) {
+						this.btn.delDisabled = false;	
+					} else {
+						this.btn.delDisabled = true;
+					}
+					
+					this.checkedData = [];
+					
+					for (var i = 0, len = selection.length; i < len; i++) {
+						this.checkedData[this.checkedData.length] = selection[i].custCd;
+					}
+				},
+				// 고객사 자동 검색
+				custSearch: function (custNm) {
+					this.mainVue.$axios.search('/cust', { custNm: custNm, useYn: "" }, function (result) {
+						this.cust = result;
+					}.bind(this));
+				},
+				// 정산은행구분 조회
+				initBankTp: function () {
+					this.mainVue.$axios.search('/code/getCode/BANK_TP', null, function (result) {
+						this.bankTp = result;
+					}.bind(this));
+				},
+				// 추가
+				add: function () {
+					this.inputForm = this.initInputForm();
+					this.inputForm.title = '[[#{사업장 추가}]]';
+					
+					this.formError = this.initFormError();
+					
+					this.dialogFormVisible = true;
+					this.btn.saveDisabled = false;
+				},
+				// 수정
+				up: function () {
+					this.mainVue.$axios.get(this.url + '/' + this.selectData.custCd, function (result) {
+						result.statu = "U";
+						result.title = "[[#{사업장 수정}]]";
+						
+						if (util.isEmpty(result.topCust)) {
+							result.topCust = { custCd: null, custNm: '' };
+						}
+						
+						result.delFiles = [];
+						
+						this.inputForm = result;
+						
+						this.formError = this.initFormError();
+						
+						this.dialogFormVisible = true;
+						this.btn.saveDisabled = false;
+					}.bind(this), true);
+				},
+				// 조회
+				search: function () {
+					this.mainVue.$axios.search(this.url, this.searchForm, function (result) {
+						this.tableData = result;
+						
+						this.btn.addDisabled = false;
+						this.btn.upDisabled = true;
+						this.btn.delDisabled = true;
+						
+						this.inputForm = this.initInputForm();
+						this.formError = this.initFormError();
+					}.bind(this), false);
+				},
+				// 삭제
+				del: function () {
+					this.mainVue.$confirm("[[#{{0}를 삭제 하시겠습니까?(#{사업장 정보})}]]", this.mainVue.appMsg.systemAlterTitle, {
+				          confirmButtonText: "[[#{삭제}]]",
+				          cancelButtonText: "[[#{취소}]]",
+				          type: 'info'
+				        }).then(function () {
+				        	this.mainVue.$axios.del(this.url + "/" + this.checkedData.join(","), function (result) {
+				        		this.mainVue.$message({ type: 'success', message: "[[#{삭제 성공}]]" });
+				        		this.search();
+							}.bind(this), true);
+				        }.bind(this)).catch(function () {
+				        	this.mainVue.$message({ type: 'info', message: "[[#{삭제 취소}]]" });
+				        }.bind(this));
+				},
+				// 저장
+				save: function () {
+					this.formError = this.initFormError();
+					
+					this.inputForm.files = this.inputForm.files.concat(this.inputForm.delFiles);
+					
+					if ('I' === this.inputForm.statu) {
+						this.mainVue.$axios.add(this.url, this.inputForm, this.formError, function (result) {
+							this.mainVue.$message({ type: 'success', message: "[[#{등록 성공}]]" });
+							this.dialogFormVisible = false;
+							this.search();
+						}.bind(this), true);
+					} else {
+						this.mainVue.$axios.up(this.url + "/" + this.inputForm.custCd, this.inputForm, this.formError, function (result) {
+							this.mainVue.$message({ type: 'success', message: "[[#{수정 성공}]]" });
+							this.dialogFormVisible = false;
+							this.search();
+						}.bind(this), true);
+					}
+				},
+				// 첨부 파일 추가
+				custFileAdd: function (file, fileList) {
+					util.imgToBase64(URL.createObjectURL(file.raw), file.raw.type, function (data) {
+						this.inputForm.files.push({
+							url: data,
+							name: file.name,
+							status: "ready"
+						});
+					}.bind(this));
+				},
+				// 수정 시 업로드 했던 이미지 삭제 시 삭제 리스트에 저장
+				custFileRemove: function (file, fileList) {
+					var tmp = -1;
+					for (var i = 0, len = this.inputForm.files.length; i < len; i++) {
+						if (this.inputForm.files[i].url == file.url) {
+							tmp = i;
+						}
+					}
+					
+					if (tmp > -1) {
+						this.inputForm.files.splice(tmp, 1);	
+					}
+					
+					if (file.status == "success") {
+						file.status = "del";
+						this.inputForm.delFiles.push(file);
+					}
+				},
+				fileNameChange: function (file) {
+					if ("ready" != file.status) {
+						file.status = 'change';	
+					}
+				},
+				initDaum: function () {
+					var thiz = this;
+					
+					new daum.Postcode({
+				        oncomplete: function (data) {
+			        		thiz.inputForm.zipCd = data.zonecode;
+			        		thiz.inputForm.addr = data.address;
+			        		
+			        		thiz.$refs.addr_dtl.focus();
+				        }
+				    }).open();
+				}
+		    }
+		});
+	/*]]>*/
+	</script>
+</body>
+</html>

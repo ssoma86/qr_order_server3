@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:include="main/import :: head"></head>
+<body>
+	<style type="text/css">
+		.noti_div {
+			padding: 20px;
+			border-top: 1px solid #DADDE4;
+			overflow: auto;
+		}
+		
+		.el-collapse {
+			border-top: none;
+		}
+		
+		.el-collapse-item__header.is-active {
+			border-bottom: 1px solid #DADDE4;
+		}
+		
+		.noti-title {
+			padding: 0 20px;
+			width: 100%;
+		}
+		
+		.noti-content {
+			padding: 20px 40px;
+		}
+		
+		.el-badge__content.is-fixed {
+			top: 24px;
+		}
+	</style>
+	<div id="app" class="contain">
+		<!-- 검색 영역 -->
+		<div ref="search_form"></div>
+		
+		<!-- 버튼 -->
+		<div ref="buttons"></div>
+		
+		<!-- 공지사항 -->
+		<div class="noti_div" :style="{ height: tableHeight + 'px' }">
+			<el-collapse v-model="collapse_val" v-for="(noti, index) in tableData" :key="'noti_' + index" accordion>
+				<el-collapse-item :name="index">
+					<template slot="title" >
+						<el-badge value="new" v-if="isNew(noti.startDtm)">
+							<div class="noti-title">{{ '[ ' + noti.startDtm + ' ] ' + noti.notiTitle }}</div>
+						</el-badge>
+						
+						<div class="noti-title" v-else>{{ '[ ' + noti.startDtm + ' ] ' + noti.notiTitle }}</div>
+						
+					</template>
+					<div v-html="noti.content.replace(/\n/gm, '<br/>')" class="noti-content"></div>
+				</el-collapse-item>
+			</el-collapse>
+		</div>
+	</div>
+	
+    <script type="text/javascript">
+	/*<![CDATA[*/
+		new Vue({
+			el: '#app',
+			data: function () {
+				var data = parent.mainVue.initData();
+				data.url = "/noti";
+				
+				data.collapse_val = 0;
+				
+				return data;
+			},
+			created: function () {
+				this.search();
+			},
+			mounted: function () {
+				setTimeout(function () {
+					this.$nextTick(function () {
+						this.mainVue.currVue = this;
+					}.bind(this));	
+				}.bind(this), 500);
+			},
+			methods: {
+				// 조회
+				search: function () {
+					this.mainVue.$axios.search(this.url + "/showNotiList", null, function (result) {
+						this.tableData = result;
+					}.bind(this), false);
+				},
+				isNew: function (startDtm) {
+					var sdtm = new Date(startDtm);
+					var nowdtm = new Date();
+					
+					if (sdtm.getTime() > nowdtm.getTime() - 1000 * 60 * 60 * 24 * 1) {
+						return true;	
+					} else {
+						return false;
+					}
+				}
+		    }
+		});
+	/*]]>*/
+	</script>
+</body>
+</html>

@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:include="main/import :: head"></head>
+<body>
+	<div id="app" class="contain">
+		<!-- 검색 조건 -->
+		<div class="search_form" ref="search_form">
+			<el-form :inline="true" :model="searchForm" label-width="120px" label-suffix=":" :size="size" @submit.native.prevent>
+				<el-row>
+					<el-col :span="7">
+						<el-form-item th:label="#{권한ID}">
+							<el-input v-model="searchForm.authId" @keyup.enter.native="search" clearable="true"></el-input>
+						</el-form-item>
+					</el-col>
+					<el-col :span="7">
+						<el-form-item th:label="#{권한명}">
+							<el-input v-model="searchForm.authNm" @keyup.enter.native="search" clearable="true"></el-input>
+						</el-form-item>
+					</el-col>
+					<el-col :span="7">
+						<el-form-item th:label="#{사용 가능 여부}">
+							<combo :data="mainVue.code.useYn" th:label="#{전체}" :model="searchForm.useYn" @change="searchForm.useYn = $event"></combo>
+						</el-form-item>
+					</el-col>
+				</el-row>
+			</el-form>
+		</div>
+		
+		<!-- 버튼-->
+		<div class="buttons" ref="buttons">
+			<el-button th:if='${sa_actions.contains("AuthSearch")}' :size="size" th:text="#{검색}" @click="search" icon="el-icon-search" ></el-button>
+			<el-button th:if='${sa_actions.contains("AuthAdd")}' :size="size" th:text="#{등록}" @click="add" icon="el-icon-circle-plus-outline" :disabled="btn.addDisabled" ></el-button>
+			<el-button th:if='${sa_actions.contains("AuthUp")}' :size="size" th:text="#{수정}" @click="up" icon="el-icon-edit-outline" :disabled="btn.upDisabled" ></el-button>
+			<el-button th:if='${sa_actions.contains("AuthDel")}' :size="size" th:text="#{삭제}" @click="del" icon="el-icon-remove-outline" :disabled="btn.delDisabled" ></el-button>
+			<el-button th:if='${sa_actions.contains("AuthAuth")}' :size="size" th:text="#{리소스 설정}" @click="openAuth" icon="el-icon-setting" :disabled="btn.openAuthDisabled" ></el-button>
+			<el-button th:if='${sa_actions.contains("AuthAdd") || sa_actions.contains("AuthUp")}' :size="size" th:text="#{저장}" @click="save" icon="el-icon-check" :disabled="btn.saveDisabled" style="float: right;"></el-button>
+		</div>
+		
+		<!-- 리스트 -->
+		<el-row :gutter="20">
+			<el-col :span="16">
+				<el-table :height="tableHeight" border stripe highlight-current-row tooltip-effect="dark"
+						:data="tableData" :size="size" th:empty-text="#{데이타 없음}"
+						@row-click="handleRowClick" @select="handleRowChecked" @select-all="handleRowChecked">
+					<el-table-column :label="tableData.length" type="index" 	width="55" align="center" sortable fixed label-class-name="data_cnt"></el-table-column>
+					<el-table-column type="selection" 		width="45" 		align="center" fixed></el-table-column>
+					<el-table-column th:label="#{권한ID}" 	prop="authId" 	width="180" align="center" fixed show-overflow-tooltip></el-table-column>
+					<el-table-column th:label="#{권한명}" 	prop="authNm" 	min-width="200" sortable show-overflow-tooltip></el-table-column>
+					<el-table-column th:label="#{사용 가능 여부}" prop="useYn" 	min-width="100" align="center" :formatter="mainVue.formatterCode"></el-table-column>
+					<el-table-column th:label="#{권한 설명}" 	prop="authDesc" min-width="300" show-overflow-tooltip></el-table-column>
+				</el-table>
+			</el-col>
+			<el-col :span="8">
+				<el-card shadow="never" v-show="inputFormCard" :style="{ height: inputHeight + 'px' }">
+					<div slot="header">
+						<span th:text="#{권한}"></span>
+						<span v-if="'I' == inputForm.statu" th:text="#{추가}"></span>
+						<span v-if="'U' == inputForm.statu" th:text="#{수정}"></span>
+					</div>
+					<div>
+						<el-form :model="inputForm" label-width="120px" label-suffix=":" :size="size" :disabled="fromDisabled" @submit.native.prevent>
+							<el-form-item th:label="#{권한ID}" :error="formError.authId" required>
+								<el-input v-model="inputForm.authId" maxlength="50" show-word-limit
+									clearable="true" v-if="'I' === inputForm.statu"></el-input>
+								<span v-else class="show_cd">{{ inputForm.authId }}</span>
+							</el-form-item>
+							<el-form-item th:label="#{권한명}" :error="formError.authNm" required>
+								<el-input v-model="inputForm.authNm" maxlength="50" clearable="true" show-word-limit></el-input>
+							</el-form-item>
+							<el-form-item th:label="#{사용 가능 여부}" required>
+								<combo :data="mainVue.code.useYn" :model="inputForm.useYn" @change="inputForm.useYn = $event"></combo>
+							</el-form-item>
+							<el-form-item th:label="#{권한 설명}" :error="formError.authDesc">
+								<el-input v-model="inputForm.authDesc" type="textarea" maxlength="250" show-word-limit></el-input>
+							</el-form-item>
+						</el-form>
+					</div>
+				</el-card>
+				
+				<el-card shadow="never" v-show="!inputFormCard">
+					<div slot="header">
+						<span th:text="#{리소스 설정}"></span>
+					</div>
+					<el-tabs v-model="activeName">
+						<el-tab-pane th:label="#{메뉴}" name="menu">
+							<el-table :height="subTableHeight2" border stripe highlight-current-row tooltip-effect="dark"
+									ref="menuTable" :data="menuTableData" :size="size" th:empty-text="#{데이타 없음}"
+									@select="menuHandleRowChecked" @select-all="menuHandleRowChecked"
+									row-key="resourcesCd" :tree-props="{ children: 'subMenu' }" default-expand-all>
+								<el-table-column type="selection" 		width="45" 		align="center"></el-table-column>
+								<el-table-column th:label="#{코드}" 		prop="resourcesCd" 	width="100" align="left"></el-table-column>
+								<el-table-column th:label="#{메뉴명}" 	prop="menuNmLan" 	min-width="150" show-overflow-tooltip></el-table-column>
+								<el-table-column th:label="#{호출 타입}" 	prop="method" 	min-width="80" align="center"></el-table-column>
+								<el-table-column th:label="#{사용 가능 여부}" prop="useYn" 	min-width="110" align="center" :formatter="mainVue.formatterCode"></el-table-column>
+							</el-table>
+						</el-tab-pane>
+						<el-tab-pane th:label="#{이벤트}" name="action">
+							<el-table :height="subTableHeight2" border stripe highlight-current-row tooltip-effect="dark"
+									ref="actionTable" :data="actionTableData" :size="size" th:empty-text="#{데이타 없음}"
+									@select="actionHandleRowChecked" @select-all="actionHandleRowChecked">
+								<el-table-column type="selection" 		width="45" 		align="center"></el-table-column>
+								<el-table-column th:label="#{아이디}" 	prop="actionId" 	width="120" sortable fixed show-overflow-tooltip></el-table-column>
+								<el-table-column th:label="#{이벤트명}" 	prop="actionNm" 	min-width="150" sortable show-overflow-tooltip></el-table-column>
+								<el-table-column th:label="#{타입}" 		prop="actionTp.nm" 	min-width="70" align="center"></el-table-column>
+								<el-table-column th:label="#{주소}" 		prop="url" 			min-width="150" sortable show-overflow-tooltip></el-table-column>
+								<el-table-column th:label="#{호출 타입}" 	prop="method" 		min-width="100" sortable></el-table-column>
+								<el-table-column th:label="#{사용 가능 여부}" prop="useYn" 		min-width="110" align="center" :formatter="mainVue.formatterCode"></el-table-column>
+							</el-table>
+						</el-tab-pane>
+					</el-tabs>
+				</el-card>
+			</el-col>
+		</el-row>
+	</div>
+	
+    <script type="text/javascript" charset="UTF-8">
+	/*<![CDATA[*/
+		new Vue({
+			el: '#app',
+			data: function () {
+				var data = parent.mainVue.initData();
+				data.url = "/auth";
+				
+				// 리소스 설정 부분
+				data.btn.openAuthDisabled = true;
+				data.inputFormCard = true;
+				
+				data.activeName = 'menu';
+				data.menuTableData = [];
+				data.actionTableData = [];
+				data.menuResources = [];
+				data.actionResources = [];
+				
+				data.searchForm = this.initSearchForm();
+				data.inputForm = this.initInputForm();
+				data.formError = this.initFormError();
+				
+				return data;
+			},
+			created: function () {
+				this.search();
+				this.initResources();
+			},
+			mounted: function () {
+				setTimeout(function () {
+					this.$nextTick(function () {
+						this.mainVue.currVue = this;
+					}.bind(this));	
+				}.bind(this), 500);
+			},
+			watch: {
+				'inputForm.authId': function (newVal, oldVal) {
+					if ('' != newVal && this.inputForm.statu == 'I') {
+						this.chkAuthId();
+					}
+				},
+				'inputForm.authNm': function (newVal, oldVal) {
+					if ('' != newVal) {
+						this.chkAuthNm();
+					}
+				}
+			},
+			methods: {
+				// 검색 조건 초기화
+				initSearchForm: function () {
+					return {
+						authId: '',
+						authNm: '',
+						useYn: ''
+					}
+				},
+				// 입력폼 초기화
+				initInputForm: function () {
+					return {
+						statu: "I",
+						authId: '',
+						authNm: '',
+						authDesc: '',
+						useYn: 'Y'
+					}
+				},
+				// 오류 메세지 초기화
+				initFormError: function () {
+					return {
+						authId: '',
+						authNm: '',
+						authDesc: ''
+					}
+				},
+				// 그리드 선택 이벤트
+				handleRowClick: function (val) {
+					if (null != val) {
+						this.btn.upDisabled = false;
+						this.btn.openAuthDisabled = false;
+					}
+					this.selectData = val;
+				},
+				// 체크 박스 체크 이벤트
+				handleRowChecked: function (selection, row) {
+					if (selection.length > 0) {
+						this.btn.delDisabled = false;
+					} else {
+						this.btn.delDisabled = true;
+					}
+					
+					this.checkedData = [];
+					
+					for (var i = 0, len = selection.length; i < len; i++) {
+						this.checkedData[this.checkedData.length] = selection[i].authId;
+					}
+				},
+				// 추가
+				add: function () {
+					this.inputForm = this.initInputForm();
+					this.formError = this.initFormError();
+					
+					this.btn.saveDisabled = false;
+					this.fromDisabled = false;
+					this.inputFormCard = true;
+				},
+				// 수정
+				up: function () {
+					this.mainVue.$axios.get(this.url + '/' + this.selectData.authId, function (result) {
+						result.statu = "U";
+						
+						this.inputForm = result;
+						
+						this.formError = this.initFormError();
+						
+						this.btn.saveDisabled = false;
+						this.fromDisabled = false;
+						this.inputFormCard = true;
+					}.bind(this), true);
+				},
+				// 조회
+				search: function () {
+					this.mainVue.$axios.search(this.url, this.searchForm, function (result) {
+						this.tableData = result;
+						
+						this.btn.addDisabled = false;
+						this.btn.upDisabled = true;
+						this.btn.delDisabled = true;
+						this.btn.saveDisabled = true;
+						this.btn.openAuthDisabled = true;
+						this.fromDisabled = true;
+						this.inputFormCard = true;
+						
+						this.inputForm = this.initInputForm();
+						this.formError = this.initFormError();
+					}.bind(this), false);
+				},
+				// 삭제
+				del: function () {
+					this.mainVue.$confirm("[[#{{0}를 삭제 하시겠습니까?(#{권한 정보})}]]", this.mainVue.appMsg.systemAlterTitle, {
+				          confirmButtonText: "[[#{삭제}]]",
+				          cancelButtonText: "[[#{취소}]]",
+				          type: 'info'
+				        }).then(function () {
+				        	this.mainVue.$axios.del(this.url + "/" + this.checkedData.join(","), function (result) {
+				        		this.mainVue.$message({ type: 'success', message: "[[#{삭제 성공}]]" });
+				        		this.search();
+							}.bind(this), true);
+				        }.bind(this)).catch(function () {
+				        	this.mainVue.$message({ type: 'info', message: "[[#{삭제 취소}]]" });
+				        }.bind(this));
+				},
+				// 저장
+				save: function () {
+					this.formError = this.initFormError();
+					
+					if (this.inputFormCard) {
+						if ('I' === this.inputForm.statu) {
+							this.mainVue.$axios.add(this.url, this.inputForm, this.formError, function (result) {
+								this.mainVue.$message({ type: 'success', message: "[[#{등록 성공}]]" });
+								this.search();
+							}.bind(this), true);
+						} else {
+							this.mainVue.$axios.up(this.url + "/" + this.inputForm.authId, this.inputForm, this.formError, function (result) {
+								this.mainVue.$message({ type: 'success', message: "[[#{수정 성공}]]" });
+								this.search();
+							}.bind(this), true);
+						}	
+					} else {
+						this.mainVue.$axios.up(this.url + "/" + this.inputForm.authId, this.inputForm, this.formError, function (result) {
+							this.mainVue.$message({ type: 'success', message: "[[#{수정 성공}]]" });
+							this.search();
+						}.bind(this), true);
+					}
+					
+				},
+				// 권한ID 체크
+				chkAuthId: function () {
+					this.mainVue.$axios.patchNonLoading(this.url + '/chk/' + this.inputForm.authId, null, null, function (result) {
+						if ("" == result) {
+							this.formError.authId = '';
+							this.btn.saveDisabled = false;
+						} else {
+							this.formError.authId = "[[#{이미 사용중인 {0}입니다.(#{권한ID})}]]";
+							this.btn.saveDisabled = true;
+						}
+					}.bind(this), false);
+				},
+				// 권한명 체크
+				chkAuthNm: function () {
+					this.mainVue.$axios.patchNonLoading(this.url + '/chkNm/' + this.inputForm.authNm, null, null, function (result) {
+						if ("" == result || result.authId == this.inputForm.authId) {
+							this.formError.authNm = '';
+							this.btn.saveDisabled = false;
+						} else {
+							this.formError.authNm = "[[#{이미 사용중인 {0}입니다.(#{권한명})}]]";
+							this.btn.saveDisabled = true;
+						}
+					}.bind(this), false);
+				},
+				// 메뉴, 이벤트 데이타 초기화
+				initResources: function () {
+					this.mainVue.$axios.search('/menu', { menuNm: "", useYn: "" }, function (result) {
+						this.menuTableData = result;
+					}.bind(this), false);
+					
+					this.mainVue.$axios.search('/action', { actionNm: "", useYn: "", actionTpCd: 0 }, function (result) {
+						this.actionTableData = result;
+					}.bind(this), false);
+				},
+				// 리소스 설정 팝업
+				openAuth: function () {
+					this.mainVue.$axios.get(this.url + '/' + this.selectData.authId, function (result) {
+						this.inputForm = result;
+						
+						this.inputFormCard = false;
+						this.fromDisabled = true;
+						this.btn.saveDisabled = false;
+						this.activeName = 'menu';
+						
+						// 권한 가지고 있는 리소스
+						var resCds = [];
+						
+						for (var i = 0, len = this.inputForm.resources.length; i < len; i++) {
+							resCds.push(this.inputForm.resources[i].resourcesCd);
+						}
+						
+						this.$refs.menuTable.clearSelection();
+						
+						for (var i = 0, len = this.menuTableData.length; i < len; i++) {
+							if (resCds.indexOf(this.menuTableData[i].resourcesCd) > -1) {
+								this.$refs.menuTable.toggleRowSelection(this.menuTableData[i], true);
+								this.menuResources.push(this.menuTableData[i]);
+							}
+							
+							for (var j = 0, jlen = this.menuTableData[i].subMenu.length; j < jlen; j++) {
+								if (resCds.indexOf(this.menuTableData[i].subMenu[j].resourcesCd) > -1) {
+									this.$refs.menuTable.toggleRowSelection(this.menuTableData[i].subMenu[j], true);
+									this.menuResources.push(this.menuTableData[i].subMenu[j]);
+								}
+							}
+						}
+						
+						this.$refs.actionTable.clearSelection();
+						
+						for (var i = 0, len = this.actionTableData.length; i < len; i++) {
+							if (resCds.indexOf(this.actionTableData[i].resourcesCd) > -1) {
+								this.$refs.actionTable.toggleRowSelection(this.actionTableData[i], true);
+								this.actionResources.push(this.actionTableData[i]);
+							}
+						}
+					}.bind(this), true);
+				},
+				// 메뉴, 이벤트 리스트 체크 이벤트
+				menuHandleRowChecked: function (selection) {
+					this.menuResources = selection;
+					this.inputForm.resources = this.menuResources.concat(this.actionResources);
+				},
+				// 메뉴, 이벤트 리스트 체크 이벤트
+				actionHandleRowChecked: function (selection) {
+					this.actionResources = selection;
+					this.inputForm.resources = this.actionResources.concat(this.menuResources);
+				}
+		    }
+		});
+	/*]]>*/
+	</script>
+</body>
+</html>

@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:include="main/import :: head"></head>
+<body>
+	<div id="app" class="contain">
+		<!-- 검색 조건 -->
+		<div class="search_form" ref="search_form">
+			<el-form :inline="true" :model="searchForm" label-width="120px" label-suffix=":" :size="size" @submit.native.prevent>
+				<el-row>
+					<el-col :span="10">
+						<el-form-item th:label="#{키워드}">
+							<el-input v-model="searchForm.nm" @keyup.enter.native="search" style="width: 200%;" clearable="true"></el-input>
+						</el-form-item>
+					</el-col>
+					<el-col :span="6">
+						<el-form-item th:label="#{단말 타입}">
+							<code-combo :data="clientTp" th:label="#{전체}" :model="searchForm.clientTpCd" @change="searchForm.clientTpCd = $event.cd"></code-combo>
+						</el-form-item>
+					</el-col>
+				</el-row>
+			</el-form>
+        </div>
+        
+        <!-- 버튼-->
+        <div class="buttons" ref="buttons">
+            <el-button th:if='${sa_actions.contains("LanDataSearch")}' :size="size" th:text="#{검색}" @click="search" icon="el-icon-search"></el-button>
+            <el-button th:if='${sa_actions.contains("LanDataAdd")}' :size="size" th:text="#{등록}" @click="add" icon="el-icon-circle-plus-outline" :disabled="btn.addDisabled"></el-button>
+            <el-button th:if='${sa_actions.contains("LanDataUp")}' :size="size" th:text="#{수정}" @click="up" icon="el-icon-edit-outline" :disabled="btn.upDisabled"></el-button>
+            <el-button th:if='${sa_actions.contains("LanDataDown")}' :size="size" th:text="#{출력}" @click="downExcel" icon="el-icon-download"></el-button>
+            
+            <el-upload th:if='${sa_actions.contains("LanDataDown")}' :show-file-list="false" action="/lanData/up" accept="application/vnd.ms-excel"
+            		 style="display: inline; margin-left: 10px;" :on-success="upSuccess" :on-error="upError">
+  				<el-button :size="size" th:text="#{업로드}" icon="el-icon-upload"></el-button>
+			</el-upload>
+
+            <el-button th:if='${sa_actions.contains("LanDataAdd") || sa_actions.contains("LanDataUp")}' :size="size" th:text="#{저장}" @click="save" icon="el-icon-check" :disabled="btn.saveDisabled" style="float: right;"></el-button>
+        </div>
+        
+        <!-- 리스트 -->
+        <el-row :gutter="20">
+            <el-col :span="16">
+                <div id="out-table">
+                    <el-table :height="tableHeight" border stripe highlight-current-row tooltip-effect="dark"
+                            :data="tableData" :size="size" th:empty-text="#{데이타 없음}" @row-click="handleRowClick">
+                        <el-table-column :label="tableData.length" type="index" width="55" align="center" label-class-name="data_cnt"></el-table-column>
+                        <el-table-column th:label="#{언어 코드}" prop="id" min-width="200" sortable show-overflow-tooltip></el-table-column>
+                        <el-table-column th:label="#{단말 타입}" prop="clientTp.nmLan" min-width="120" align="center" sortable show-overflow-tooltip></el-table-column>
+                        <el-table-column v-for="item in lans" :label="item.nm" :prop="item.id" min-width="200" sortable show-overflow-tooltip></el-table-column>
+                    </el-table>
+                </div>
+            </el-col>
+            <el-col :span="8">
+                <el-card shadow="never" :style="{ height: inputHeight + 'px' }">
+                    <div slot="header">
+                        <span th:text="#{언어}"></span>
+                        <span v-if="'I' == inputForm.statu" th:text="#{추가}"></span>
+                        <span v-if="'U' == inputForm.statu" th:text="#{수정}"></span>
+                    </div>
+                    <div>
+                        <el-form :model="inputForm" label-width="120px" label-suffix=":"
+                                :size="size" :disabled="fromDisabled" @submit.native.prevent>
+                            <el-form-item th:label="#{언어 코드}" :error="formError.id" required>
+                                <el-input v-model="inputForm.id" maxlength="250" show-word-limit
+									clearable="true" v-if="'I' === inputForm.statu"></el-input>
+								<span v-else class="show_cd">{{ inputForm.id }}</span>
+                            </el-form-item>
+                            <el-form-item th:label="#{단말 타입}" :error="formError['clientTp.cd']" required>
+								<code-combo :data="clientTp" :model="inputForm.clientTp" @change="inputForm.clientTp = $event"></code-combo>
+							</el-form-item>
+                            <el-form-item th:label="#{한국어}" :error="formError.nm" required>
+                                <el-input v-model="inputForm.nm" type="textarea" maxlength="250" show-word-limit></el-input>
+                            </el-form-item>
+                            <el-form-item v-for="item in inputForm.lanDatas" :label="item.lan.nm">
+                                <el-input v-model="item.nm" type="textarea" maxlength="250" show-word-limit></el-input>
+                            </el-form-item>
+                        </el-form>
+                    </div>
+                </el-card>
+            </el-col>
+        </el-row>
+	</div>
+    <script type="text/javascript" charset="UTF-8">
+	/*<![CDATA[*/
+		new Vue({
+			el: '#app',
+			data: function () {
+				var data = parent.mainVue.initData();
+                
+				data.url = '/lanData';
+				
+				data.lans = [];
+                data.clientTp = [];
+                
+				data.searchForm = this.initSearchForm();
+				data.inputForm = this.initInputForm();
+				data.formError = this.initFormError();
+				
+				
+				
+				return data;
+			},
+			created: function () {
+				this.initLan();
+				this.initClientTp();
+				this.search();
+			},
+			mounted: function () {
+				setTimeout(function () {
+					this.$nextTick(function () {
+						this.mainVue.currVue = this;
+					}.bind(this));	
+				}.bind(this), 1000);
+			},
+			watch: {
+				'inputForm.id': function (newVal, oldVal) {
+					if ('' != newVal && 'I' === this.inputForm.statu) {
+						this.chkLanDataId();
+					}
+				},
+				'inputForm.clientTp.cd': function (newVal, oldVal) {
+					for (var i = 0, len = this.inputForm.lanDatas.length; i < len; i++) {
+						this.inputForm.lanDatas[i].clientTp.cd = newVal;
+					}
+				}
+			},
+			methods: {
+				// 검색 조건 초기화
+				initSearchForm: function () {
+					return {
+						nm: '',
+						clientTpCd: 0
+					}
+				},
+				// 입력폼 초기화
+				initInputForm: function () {
+					var obj = {
+						statu: "I",
+						cd: 0,
+						id: '',
+						nm: '',
+						useYn: 'Y',
+						lan: null,
+						clientTp: { cd: null, nm: '' },
+						lanDatas: []
+					}
+					
+					if (null != this.lans) {
+						// 기타 언어 변수 설정
+						for (var i = 0, len = this.lans.length; i < len; i++) {
+							if ('ko' == this.lans[i].id) {
+								obj.lan = this.lans[i];
+							} else {
+								obj.lanDatas.push({
+										cd: 0,
+                                        id: '',
+                                        nm: '',
+										useYn: 'Y',
+										lan: this.lans[i],
+										clientTp: { cd: null, nm: '' }
+								});
+							}
+						}
+					}
+					
+					return obj;
+				},
+				// 오류 메세지 초기화
+				initFormError: function () {
+					return {
+						id: '',
+						nm: '',
+						'clientTp.cd': ''
+					}
+				},
+                // 그리드 선택 이벤트
+				handleRowClick: function (val) {
+					if (null != val) {
+						this.btn.upDisabled = false;
+					}
+					this.selectData = val;
+				},
+				// 언어 데이타 조회
+				initLan: function () {
+					this.mainVue.$axios.search("/language", null, function (result) {
+						this.lans = result;
+					}.bind(this), false);
+				},
+				// 단말 타입 데이타 조회
+				initClientTp: function () {
+					this.mainVue.$axios.search("/code/getCode/CLIENT_TP", null, function (result) {
+						this.clientTp = result;
+					}.bind(this), false);
+				},
+				// 추가
+				add: function () {
+					this.inputForm = this.initInputForm();
+					// 단말 타입 처음 항목 설정
+					this.inputForm.clientTp = this.clientTp.length > 0 ? util.copyObj(this.clientTp[0]) : { cd: null, nm: '' };
+					for (var i = 0, len = this.inputForm.lanDatas.length; i < len; i++) {
+						this.inputForm.lanDatas[i].clientTp = this.clientTp.length > 0 ? util.copyObj(this.clientTp[0]) : { cd: null, nm: '' };
+					}
+					
+					this.formError = this.initFormError();
+					
+					this.btn.saveDisabled = false;
+					this.fromDisabled = false;
+				},
+				// 수정
+				up: function () {
+					this.mainVue.$axios.get(this.url + '/' + this.selectData.cd, function (result) {
+						result.statu = "U";
+						
+						this.inputForm = result;
+						
+						// 수정 시 등록되지 안은 기타 언어 변수 설정
+						for (var i = 0, len = this.lans.length; i < len; i++) {
+							if ('ko' != this.lans[i].id) {
+								var isContains = false;
+								
+								for (var j = 0, jlen = this.inputForm.lanDatas.length; j < jlen; j++) {
+									if (this.inputForm.lanDatas[j].lan.id === this.lans[i].id) {
+										isContains = true;
+									}
+								}
+								
+								if (!isContains) {
+									this.inputForm.lanDatas.push({
+											cd: 0,
+											id: this.inputForm.id,
+											nm: this.inputForm.id,
+											useYn: 'Y',
+											lan: this.lans[i],
+											clientTp: this.inputForm.clientTp
+									});
+								}
+							}
+						}
+						
+						this.formError = this.initFormError();
+						
+						this.btn.saveDisabled = false;
+						this.fromDisabled = false;
+					}.bind(this), true);
+				},
+				// 조회
+				search: function () {
+					this.mainVue.$axios.search(this.url, this.searchForm, function (result) {
+						this.tableData = [];
+						
+						for (var i = 0, len = result.length; i < len; i++) {
+							var tmp = result[i];
+							
+							tmp[result[i].lan.id] = result[i].nm;
+							
+							for (var j = 0, jlen = result[i].lanDatas.length; j < jlen; j++) {
+								tmp[result[i].lanDatas[j].lan.id] = result[i].lanDatas[j].nm;
+							}
+							
+							this.tableData.push(tmp);
+						}
+						
+						this.btn.addDisabled = false;
+						this.btn.upDisabled = true;
+						this.btn.saveDisabled = true;
+						this.fromDisabled = true;
+						
+						this.inputForm = this.initInputForm();
+						this.formError = this.initFormError();
+					}.bind(this), true);
+				},
+				// 저장
+				save: function () {
+					this.formError = this.initFormError();
+					
+					var tmpInput = {
+							cd: this.inputForm.cd,
+							id: this.inputForm.id,
+							nm: this.inputForm.nm,
+							useYn: this.inputForm.useYn,
+							lan: this.inputForm.lan,
+							clientTp: this.inputForm.clientTp,
+							lanDatas: []
+					};
+					
+					// 입력되지 안은 언어 삭제
+					for (var i = 0, len = this.inputForm.lanDatas.length; i < len; i++) {
+						if ('' != this.inputForm.lanDatas[i].nm) {
+							// 언어 코드 기타 언어에도 똑같이 설정
+							this.inputForm.lanDatas[i].id = this.inputForm.id;
+							this.inputForm.lanDatas[i].clientTp = this.inputForm.clientTp;
+							tmpInput.lanDatas[tmpInput.lanDatas.length] = this.inputForm.lanDatas[i];
+						}
+					}
+					
+					if ('I' === this.inputForm.statu) {
+						this.mainVue.$axios.add(this.url, tmpInput, this.formError, function (result) {
+							this.mainVue.$message({ type: 'success', message: "[[#{등록 성공}]]" });
+							this.search();
+						}.bind(this), true);
+					} else {
+						this.mainVue.$axios.up(this.url + "/" + this.inputForm.cd, tmpInput, this.formError, function (result) {
+							this.mainVue.$message({ type: 'success', message: "[[#{수정 성공}]]" });
+							this.search();
+						}.bind(this), true);
+					}
+				},
+				chkLanDataId: function () {
+					// 서버에서 한국어 기준으로 체크 함
+					this.mainVue.$axios.patchNonLoading(this.url + '/chk/' + encodeURI(this.inputForm.id), null, null, function (result) {
+						if ("" == result) {
+							this.formError.id = '';
+							this.btn.saveDisabled = false;
+						} else {
+							this.formError.id = "[[#{이미 사용중인 {0} 입니다.(#{언어 코드})}]]";
+							this.btn.saveDisabled = true;
+						}
+					}.bind(this), false);
+				},
+				downExcel: function () {
+					location.href = this.url + '/down?nm=' + this.searchForm.nm;
+				},
+				upSuccess: function () {
+					this.mainVue.$message({ type: 'success', message: "[[#{업로드 되었습니다}]]" });
+					this.search();
+				},
+				upError: function () {
+					this.mainVue.$message({ type: 'error', message: "[[#{업로드 실패 하였습니다}]]" });
+				}
+		    }
+		});
+	/*]]>*/
+	</script>
+</body>
+</html>

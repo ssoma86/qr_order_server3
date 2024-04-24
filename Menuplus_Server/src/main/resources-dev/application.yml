@@ -1,0 +1,184 @@
+debug: true
+
+#  LOGGING
+#logging:
+#  file: app.log
+
+# 서버 설정
+server:
+  port: 8185
+  servlet:
+    session:
+      timeout: 600m
+  tomcat:
+    max-http-post-size: 20971520
+    accept-count: 2000
+    max-threads: 2000
+    
+## 앱버전
+spring.mvc.view.prefix: /WEB-INF/views/
+spring.mvc.view.suffix: .jsp
+## 앱버전
+
+spring:
+  application.name: MenuPlus
+#TODO 개발,운영
+  thymeleaf:
+    mode: html
+    prefix: classpath:/templates/
+    suffix: .html
+    view-names: main/*, business/*, system/*, error/*, mpay/*
+    cache: true
+
+#TODO 로컬
+#  thymeleaf:
+#    cache: false
+#    prefix: file:src/main/resources/templates/
+## Live Reload↓ (로컬 개발 핫스왑 기능)
+#  devtools:
+#    restart:
+#      enabled: true
+
+     
+
+  jackson:
+    time-zone: "GMT+9"
+    date-format: yyyy-MM-dd HH:mm:ss
+
+  cache:
+    type: ehcache
+
+  datasource:
+   #TODO 운영
+   url: "jdbc:mysql://infinisoft-db.csvnoup7kfnh.ap-northeast-2.rds.amazonaws.com:3306/menuplus?useSSL=false&characterEncoding=utf-8&useUnicode=true&serverTimezone=GMT%2b9"
+   driver-class-name: com.mysql.jdbc.Driver
+   username: infinisoft
+   password: dlsvlsl11!
+
+    #TODO 개발
+#  url: "jdbc:mysql://211.104.172.45:3306/menuplus?useSSL=false&characterEncoding=utf-8&useUnicode=true&serverTimezone=GMT%2b9"
+#  driver-class-name: com.mysql.jdbc.Driver
+#  username: ykpark
+#  password: dlsvlsl22@
+
+    #TODO 로컬    
+#    url: "jdbc:mysql://localhost:3306/menuplus?useSSL=false&characterEncoding=utf-8&useUnicode=true&serverTimezone=GMT%2b9"
+#    driver-class-name: com.mysql.jdbc.Driver
+#    username: root
+#    password: root
+
+  hikari:
+      pool-name: app-db-pool
+      maximum-pool-size: 10
+      minimum-idle: 10
+      max-lifetime: 1800000
+      connection-timeout: 30000
+      validation-timeout: 30000
+      idle-timeout: 600000
+      connection-test-query: SELECT 1
+      allow-pool-suspension: false
+
+  jpa:
+    show-sql: true
+    properties:
+      hibernate:
+        #SQL 로그 표시방식
+        format_sql: true
+        use_sql_comments: true
+        
+        cache: # Hibernate 2 차 캐시 설정
+          use_query_cache: true
+          use_second_level_cache: true
+          ehcache.missing_cache_strategy: create
+          sharedCache.mode: ENABLE_SELECTIVE
+          region.factory_class: org.hibernate.cache.ehcache.internal.EhcacheRegionFactory
+    database-platform: org.hibernate.dialect.MySQL5InnoDBDialect
+
+    # hibernate.hbm2ddl.auto option
+    # create: 기존테이블 삭제 후 다시 생성 (DROP + CREATE)
+    # create-drop: create와 같으나 종료시점에 테이블 DROP
+    # update: 변경분만 반영
+    # validate: 엔티티와 테이블이 정상 매핑되었는지만 확인
+    # none: 사용하지 않음
+    hibernate:
+      ddl-auto: none
+      naming:
+        physical-strategy: org.springframework.boot.orm.jpa.hibernate.SpringPhysicalNamingStrategy
+
+  resources:
+    static-locations:
+    - classpath:/resources/
+    - classpath:/static/
+    - file:${upload_path}
+
+  # multipart
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+
+  mail:
+    host: smtp.naver.com
+    port: 465
+    username: infinisoft_menuplus@naver.com
+    password: porco0821!
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.ssl.enable: true
+      
+   
+
+security:
+  oauth2: # 토큰 설정
+    client:
+      access-token-validity-seconds: 2592000 #30일
+      refresh-token-validity-seconds: 8640000 #100일
+      client-id: app
+      client-secret: 1234
+      scope:
+      - app
+      authorized-grant-types:
+      - password
+      - refresh_token
+    authorization:
+      check-token-access: "isAuthenticated()"
+      jwt:
+        key-value: sk
+        key-password: 1234
+    resource:
+      jwt:
+        key-value: sk
+        key-password: 1234
+
+
+#custom
+init_data: false
+#파일 저장경로
+
+#TODO 로컬
+upload_path: D:/files/
+upload_folder: img
+
+#TODO 개발,운영
+#upload_path: /home/ec2-user/WAS/tomcat/Files/menuplus/
+#upload_folder: img
+
+#결제 설정 기타 결제 모듈 사용 시 이부분은 필요 없음
+#올앳 결제
+sShopId: id
+sCrossKey: key
+
+#tpay
+mid: tpaytest0m
+merchantKey: "VXFVMIZGqUJx29I/k52vMM8XG4hizkNfiapAkHHFxq0RwFzPit55D3J3sAeFSrLuOnLNVCIsXXkcBfYK1wv8kQ=="
+
+#crypto_key 암복호화키
+crypto_key: aeskey1234567898
+
+
+#push알림관련 비공개 키 파일위치
+fcm_key_path: classpath:api-project-1032749216875-firebase-adminsdk-8e2bc-d2e16773fc.json
+    
+#push알림관련 project_id
+project_id: api-project-1032749216875
+

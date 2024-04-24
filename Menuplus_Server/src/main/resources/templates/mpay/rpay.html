@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    
+    <meta http-equiv="pragma" content="no-cache">
+    <meta http-equiv="Cache-Control" content="no-cache, must-revalidate">
+    <meta http-equiv="expires" content="Wed, 14 Nov 1981 00:00:00 GMT">
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0">
+    <meta name="description" content="MenuPlus" />
+    <meta name="author" content="lf" />
+
+    <title>MenuPlus</title>
+    
+    <script type="text/javascript">
+    	var resultFlag = '[[${resultFlag}]]';
+    	
+    	// 정상 처리
+    	if (1 == resultFlag) {
+    		Android.done('[[${result}]]');
+    	}
+    	
+    	// 사용자 취소
+    	if (2 == resultFlag) {
+    		Android.cancel('[[${result}]]');
+    	}
+    	
+    	// 결제 오류
+    	if (0 == resultFlag) {
+    		Android.error('[[${errors}]]');
+    	}
+    </script>
+</head>
+<body>
+</body>
+</html>

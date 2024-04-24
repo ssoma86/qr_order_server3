@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:include="main/import :: head"></head>
+<body>
+	<div id="app" class="contain">
+		<!-- 검색 영역 -->
+		<div class="search_form" ref="search_form">
+			<el-form :inline="true" :model="searchForm" label-width="120px" label-suffix=":" :size="size" @submit.native.prevent>
+				<el-row>
+					<el-col :span="6">
+						<el-form-item th:label="#{객실명}">
+							<el-input v-model="searchForm.storeRoomNm" @keyup.enter.native="search" clearable="true"></el-input>
+						</el-form-item>
+					</el-col>
+					<!-- el-col :span="6">
+						<el-form-item th:label="#{사용 가능 여부}">
+							<combo :data="mainVue.code.useYn" th:label="#{전체}" :model="searchForm.useYn" @change="searchForm.useYn = $event"></combo>
+						</el-form-item>
+					</el-col -->
+				</el-row>
+			</el-form>
+		</div>
+		
+		<!-- 버튼 -->
+		<div class="buttons" ref="buttons">
+			<el-button th:if='${sa_actions.contains("StoreRoomSearch")}' :size="size" th:text="#{검색}" @click="search" icon="el-icon-search" ></el-button>
+			<el-button th:if='${sa_actions.contains("StoreRoomAdd")}' :size="size" th:text="#{등록}" @click="add" icon="el-icon-circle-plus-outline" :disabled="btn.addDisabled" ></el-button>
+			<el-button th:if='${sa_actions.contains("StoreRoomsAdd")}' :size="size" th:text="#{일괄등록}" @click="addAll"  icon="el-icon-circle-plus-outline" :disabled="btn.addAllDisabled" ></el-button>
+			<el-button th:if='${sa_actions.contains("StoreRoomDel")}' :size="size" th:text="#{삭제}" @click="del" icon="el-icon-remove-outline" :disabled="btn.delDisabled" ></el-button>
+			<el-button  :size="size" th:text="#{QR다운로드}" @click="downloadAllQR" :disabled="btn.AllQrDownloadDisabled"></el-button>
+			<el-button  :size="size" th:text="#{QRURL엑셀다운로드}" @click="downloadExcel4QRUrl" :disabled="btn.AllQrUrlDownloadDisabled"></el-button>
+		</div>
+		
+		<!-- 리스트 -->
+		<el-table :height="tableHeight" border stripe highlight-current-row tooltip-effect="dark"
+				:data="tableData" :size="size" th:empty-text="#{데이타 없음}"
+				@row-click="handleRowClick" @select="handleRowChecked" @select-all="handleRowChecked">
+			<el-table-column :label="tableData.length" type="index" 	width="55" align="center" sortable label-class-name="data_cnt"></el-table-column>
+			<el-table-column type="selection" 							width="45" align="center"></el-table-column>
+			<el-table-column th:label="#{객실명}" 		prop="storeRoomNm" 	min-width="200" sortable show-overflow-tooltip></el-table-column>
+			<!-- el-table-column th:label="#{사용 가능 여부}" 	prop="useYn" 		min-width="100" align="center" :formatter="mainVue.formatterCode"></el-table-column -->
+			
+			<el-table-column th:label="#{QR코드}"   min-width="94" align="center">
+				<template slot-scope="scope">
+					<el-popover placement="right" trigger="click">
+						<el-row style="text-align: center;">
+							<el-col :span="24">
+								<div th:text="#{매장 객실  배달  QR}"></div>
+								<canvas :id="'storeId_O_' + scope.row.store.storeId + '_' + scope.row.storeRoomCd" ></canvas>
+								<div>{{ getOutQr(scope.row.store.storeId, scope.row.storeRoomCd) }}</div>
+								<el-button style="margin-top:10px" th:text="#{다운로드}" :size="size" @click="downloadQR(scope.row.store.storeNm, scope.row.storeRoomNm, scope.row.store.storeId, scope.row.storeRoomCd)" ></el-button>
+							</el-col>
+						</el-row>
+						<el-button size="mini" slot="reference" th:text="#{QR보기}" @click="showQr(scope.row.store.storeId, scope.row.storeRoomCd)"></el-button>
+					</el-popover>
+				</template>
+			</el-table-column>
+			<el-table-column th:label="#{설명}" 			prop="storeRoomDesc" min-width="300" show-overflow-tooltip></el-table-column>
+		</el-table>
+		
+		<!-- 입력 팝업 -->
+		<el-dialog :title="inputForm.title" :visible.sync="dialogFormVisible" width="500px">
+			<el-form :model="inputForm" label-width="80px" label-suffix=":" :size="size" @submit.native.prevent>
+				<el-row :gutter="20">
+					<el-col :span="24">
+						<el-tabs value="info">
+							<el-tab-pane th:label="#{기본 정보}" name="info">
+								<el-row :gutter="20">
+									<el-col :span="24">
+										<el-form-item th:label="#{객실명}" :error="formError.storeRoomNm" required>
+											<el-input v-model="inputForm.storeRoomNm" maxlength="50" clearable="true" show-word-limit>
+												<el-button v-if="lans.length > 1" slot="append" :size="size" th:text="#{다국어 조회}" @click="dictionaryDialogFormVisible = true" icon="el-icon-search"></el-button>
+											</el-input>
+											
+											<!-- 사전 선택 -->
+											<el-dialog th:title="#{다국어 사전}" :visible.sync="dictionaryDialogFormVisible" width="900px" append-to-body>
+												<div class="search_form" style="margin-bottom: 10px;">
+													<el-form :inline="true" label-width="60px" label-suffix=":" :size="size" @submit.native.prevent>
+														<el-form-item th:label="#{언어}">
+															<el-input v-model="searchText" @keyup.enter.native="searchDictionary" clearable="true" style="width: 190%;">
+																<el-button slot="append" :size="size" th:text="#{검색}" @click="searchDictionary" icon="el-icon-search"></el-button>
+															</el-input>
+														</el-form-item>
+													</el-form>
+												</div>
+									
+												<el-table :height="tableHeight/2" border stripe highlight-current-row tooltip-effect="dark"
+														:data="popTableData" :size="size" th:empty-text="#{언어 코드}">
+									      
+													<el-table-column fixed>
+														<template slot-scope="scope">
+															<el-button :size="size" th:text="#{선택}" @click="selectDictionary(scope.row)"></el-button>
+														</template>
+													</el-table-column>
+									
+													<el-table-column th:label="#{언어 코드}" prop="id" min-width="200" sortable show-overflow-tooltip></el-table-column>
+													<el-table-column v-for="item in lans" :label="item.nm" :prop="item.id" min-width="200" sortable show-overflow-tooltip></el-table-column>
+												</el-table>
+									
+											</el-dialog>
+										</el-form-item>
+										
+										<el-form-item th:label="#{설명}" :error="formError.storeRoomDesc">
+											<el-input v-model="inputForm.storeRoomDesc" type="textarea" maxlength="250" show-word-limit :rows="5"></el-input>
+										</el-form-item>
+									</el-col>
+								</el-row>
+							</el-tab-pane>
+						</el-tabs>
+					</el-col>
+					
+				</el-row>
+			</el-form>
+			<div slot="footer" class="dialog-footer">
+				<el-button th:text="#{저장}" icon="el-icon-check" :size="size" @click="save" :disabled="btn.saveDisabled"></el-button>
+				<el-button th:text="#{닫기}" icon="el-icon-close" :size="size" @click="dialogFormVisible = false"></el-button>
+			</div>
+		</el-dialog>
+
+		<!-- 객실 정보 여러 건 입력창 -->
+		<el-dialog :title="inputAllForm.title" :visible.sync="dialogAllFormVisible" width="500px">
+			<el-form :model="inputAllForm" label-width="0" :size="size" @submit.native.prevent>
+				<el-row :gutter="20">
+					<el-col :span="24">
+						<el-tabs value="info">
+							<el-tab-pane th:label="#{객실 번호}" name="info">
+								<el-row :gutter="20" class="flex align-center">
+									<el-col :span="10">
+										<el-form-item :error="formError.storeRoomNmStart1">
+											<el-input type="number" v-model="inputAllForm.storeRoomNmStart1" maxlength="50" placeholder="시작 숫자 입력">
+											</el-input>	
+										</el-form-item>
+									</el-col>
+									<el-col :span="4" class="text-center"> ~ </el-col>									
+									<el-col :span="10">	
+										<el-form-item :error="formError.storeRoomNmEnd1">										
+											<el-input type="number" v-model="inputAllForm.storeRoomNmEnd1" maxlength="50" placeholder="끝 숫자 입력">
+											</el-input>	
+										</el-form-item>
+									</el-col>
+								</el-row>
+								<el-row :gutter="20" class="flex align-center">
+									<el-col :span="10" :error="formError.storeRoomNmStart2">
+											<el-input type="number" v-model="inputAllForm.storeRoomNmStart2" maxlength="50" placeholder="시작 숫자 입력">
+											</el-input>	
+									</el-col>
+									<el-col :span="4" class="text-center"> ~ </el-col>									
+									<el-col :span="10" :error="formError.storeRoomNmEnd2">											
+											<el-input type="number" v-model="inputAllForm.storeRoomNmEnd2" maxlength="50" placeholder="끝 숫자 입력">
+											</el-input>	
+									</el-col>
+								</el-row>
+							</el-tab-pane>
+						</el-tabs>
+					</el-col>
+					
+				</el-row>
+			</el-form>
+			<div slot="footer" class="dialog-footer">
+				<el-button th:text="#{저장}" icon="el-icon-check" :size="size" @click="saveAll" :disabled="btn.saveAllDisabled"></el-button>
+				<el-button th:text="#{닫기}" icon="el-icon-close" :size="size" @click="dialogAllFormVisible = false"></el-button>
+			</div>
+		</el-dialog>
+
+	</div>
+	
+    <script type="text/javascript">
+	/*<![CDATA[*/
+		new Vue({
+			el: '#app',
+			data: function () {
+				var data = parent.mainVue.initData();
+				data.url = '/room';
+				data.storeLans = [];
+				data.activiTab = '';
+				
+				data.searchForm = this.initSearchForm();
+				data.inputForm = this.initInputForm();
+				data.inputAllForm = this.initInputAllForm();
+				data.inputStoreNmForm = this.initInputStoreNmForm();
+				data.formError = this.initFormError();
+				
+				data.lans = [];
+				data.popTableData = [];
+				
+				data.dictionaryDialogFormVisible = false;
+				data.dialogAllFormVisible = false;
+				data.searchText = '';
+				
+				return data;
+			},
+			created: function () {
+				this.initStore();
+				this.search();
+			},
+			mounted: function () {
+				setTimeout(function () {
+					this.$nextTick(function () {
+						this.mainVue.currVue = this;
+					}.bind(this));
+				}.bind(this), 500);
+			},
+			watch: {
+				formError: {
+					deep: true,
+					handler: function (newVal, oldVal) {
+						// 벨리데이션 메세지가 값은 있는데 Vue에서 표시 안해주는 현상 처리 하기 위함
+						setTimeout(function () {
+							var tmp = this.inputForm.storeRoomNm;
+							this.inputForm.storeRoomNm = this.inputForm.storeRoomNm + ' ';
+							this.inputForm.storeRoomNm = tmp;
+							
+						}.bind(this), 500);
+					}
+				},
+
+				'inputForm.storeRoomNm': function (newVal, oldVal) {
+					if ('' != newVal) {
+						this.chkStoreRoomNm();
+					}
+				}
+			},
+			methods: {
+				// 검색 조건 초기화
+				initSearchForm: function () {
+					return {
+						storeRoomNm: '',
+						useYn: 'Y'
+					}
+				},
+
+				// 입력폼 초기화
+				initInputForm: function () {
+					return {
+						statu: "I",
+						title: '',
+						storeRoomCd: 0,
+						storeRoomNm: '',
+						storeRoomDesc: ''
+					}
+				},
+
+				// 일괄생성 입력폼 초기화
+				initInputAllForm: function () {
+					return {
+						statu: "I",
+						title: '',
+						storeRoomNmStart1: '',
+						storeRoomNmEnd1: '',
+						storeRoomNmStart2: '',
+						storeRoomNmEnd2: ''
+					}
+				},
+
+				initInputStoreNmForm: function () {
+					return {
+						storeRoomNmStart: [],
+						storeRoomNmEnd: []
+					}
+				},
+
+				// 객실명 체크
+				chkStoreRoomNm: function () {
+					this.mainVue.$axios.patchNonLoading(this.url + '/chk/' + this.inputForm.storeRoomNm, null, null, function (result) {
+
+						if ("" == result) {
+							this.formError.storeRoomNm = '';
+							this.btn.saveDisabled = false;
+						} else {
+							this.formError.storeRoomNm = "[[#{이미 사용중인 {0}입니다.(#{객실명})}]]";
+							this.btn.saveDisabled = true;
+						}
+					}.bind(this), false);
+				},
+				
+				//객실 여러개 등록시 객실명 구간체크
+				chkStoreRoomsNm: function () {
+					
+						var result = true;
+						let tempRoomNmStart1 = this.inputAllForm.storeRoomNmStart1;
+						let tempRoomNmEnd1 = this.inputAllForm.storeRoomNmEnd1;
+						let tempRoomNmStart2 = this.inputAllForm.storeRoomNmStart2;
+						let tempRoomNmEnd2 = this.inputAllForm.storeRoomNmEnd2;
+						
+						console.log('==tempRoomNmStart1:' + tempRoomNmStart1);
+						console.log('==tempRoomNmEnd1:' + tempRoomNmEnd1);
+						
+						
+						if(tempRoomNmStart1 == ''  && tempRoomNmEnd1 == ''){
+							this.formError.storeRoomNmStart1 = '[[#{값을 넣어주세요.}]]';
+							result = false;
+						}
+						
+						if(tempRoomNmStart1 == ''  && tempRoomNmEnd1 != ''){							
+							this.formError.storeRoomNmStart1 = '[[#{시작값을 넣어주세요.}]]';
+							result = false;
+						}
+						
+						if(tempRoomNmStart1 != ''  && tempRoomNmEnd1 == ''){							
+							this.formError.storeRoomNmEnd1 = '[[#{종료값을 넣어주세요.}]]';
+							result = false;
+						}		
+						
+						if(tempRoomNmStart2 == ''  && tempRoomNmEnd2 != ''){							
+							this.formError.storeRoomNmStart1 = '[[#{시작값을 넣어주세요.}]]';
+							result = false;
+						}
+						
+						if(tempRoomNmStart2 != ''  && tempRoomNmEnd2 == ''){							
+							this.formError.storeRoomNmEnd1 = '[[#{종료값을 넣어주세요.}]]';
+							result = false;
+						}	
+						
+						if(tempRoomNmStart1 != ''  && tempRoomNmEnd1 != ''){
+							if(tempRoomNmStart1 >= tempRoomNmEnd1){
+								this.formError.storeRoomNmStart1 = '[[#{시작값은 종료값보다 작아야 합니다.}]]';
+								result = false;
+							}else{
+								result = true;
+							}
+						}
+						
+						if(tempRoomNmStart2 != ''  && tempRoomNmEnd2 != ''){
+							if(tempRoomNmStart2 >= tempRoomNmEnd2){
+								this.formError.storeRoomNmStart2 = '[[#{시작값은 종료값보다 작아야 합니다.}]]';
+								result = false;
+							}else{
+								result = true;
+							}
+						}
+						
+						return result;
+						
+				},
+				
+				
+			    // 객실  QR URL
+				getOutQr: function  (storeId, storeRoomCd) {
+
+					return 'https://menuplus.kr/qr/' + storeId + '/' + storeRoomCd ;
+					//return 'http://54.180.64.84:8186/qr/' + storeId + '/' + storeRoomCd ;
+					//return 'http://15.164.247.126:8186/qr/' + storeId + '/' + storeRoomCd ;
+					//return 'https://menuplus.kr/qr/' + storeId + '/1/O';
+			    },
+
+				showQr: function (storeId, storeRoomCd) {
+					
+					console.log("=====storeId:" + storeId);
+					console.log("=====storeRoomCd:" + storeRoomCd);
+			    	
+			    	if (null != document.getElementById('storeId_O_' + storeId + '_' + storeRoomCd)) {
+			    		
+			    		console.log("==========showQr storeId:" + storeId);
+			    		
+			    		var tmp = document.getElementById('storeId_O_' + storeId + '_' + storeRoomCd);
+						tmp.innerHTML = '';		
+						new QRious({
+							element: tmp,
+							value: 'https://menuplus.kr/qr/' + storeId + '/' + storeRoomCd,
+							//value: 'http://54.180.64.84:8186/qr/' + storeId + '/' + storeRoomCd,
+							//value: 'http://15.164.247.126:8186/qr/' + storeId + '/' + storeRoomCd,
+							//value: 'http://localhost:8080/qr/' + storeRoomCd,
+							size: 160,
+						}); 
+			    	}
+				},
+				
+				dataURLToBlob(dataURL) {
+					// url을 metadata 부분과 data 부분으로 나눔
+					const parts = dataURL.split(';base64,');
+					const metadata = parts[0];
+					const data = atob(parts[1]);
+
+					// ArrayBuffer 생성
+					const buffer = new ArrayBuffer(data.length);
+					const view = new Uint8Array(buffer);
+
+					// data를 view에 복사
+					for (let i = 0; i < data.length; i++) {
+						view[i] = data.charCodeAt(i);
+					}
+
+					// blob 리턴
+					return new Blob([view], { type: metadata.split(':')[1] });
+				},
+
+				//QR 다운로드
+				downloadQR : function (storeNm, storeRoomNm, storeId,storeRoomCd) {
+					var link = document.createElement('a');
+						link.download = storeNm + '_' + storeRoomNm +'.jpg'; //qr이미지명
+						link.href = document.getElementById('storeId_O_' + storeId + '_' + storeRoomCd).toDataURL()
+						link.click();
+				},
+
+				makeQr : function (storeId,storeRoomCd){
+					var tmp = document.getElementById('storeId_O_' + storeId + '_' + storeRoomCd);
+					tmp.innerHTML = '';		
+					new QRious({
+						element: tmp,
+						value: 'https://menuplus.kr/qr/' + storeId + '/' + storeRoomCd , //운영
+						//value: 'http://15.164.247.126:8186/qr/' + storeId + '/' + storeRoomCd , //운영
+						//value: 'http://local:8186/qr/' + storeId + '/' + storeRoomNm + '/' + storeRoomCd  ,
+						size: 160,
+					}); 
+
+					return tmp.toDataURL();
+				},
+
+				//여러개 QR 다운로드
+				downloadAllQR : function(){
+					
+					const zip = new JSZip(); // JSZip 인스턴스 생성
+
+					for (let i = 0; i < this.checkedStoreRoomNm.length; i++) {
+
+						const fileName = this.checkedStoreNm[i] + "_" + this.checkedStoreRoomNm[i];
+						const dataURL = this.makeQr(this.checkedStoreId[i],this.checkedData[i]); // 이미지 얻기
+						const blob = this.dataURLToBlob(dataURL); // blob 만들기
+						zip.file(`${fileName}.jpg`, blob, { binary: true }); // zip 파일에 추가
+					}
+
+					// zip 파일을 Blob으로 만들기
+					zip.generateAsync({ type: "blob" }).then(zipFile => {           
+						saveAs(zipFile, 'qr.zip'); // zip 파일 다운로드 실행
+					});
+
+				},
+				
+				//선택한 qrUrl 리스트 엑셀파일 다운로드
+				downloadExcel4QRUrl : function(){
+					var qrUrl = [];
+					for (let i = 0; i < this.checkedStoreRoomNm.length; i++) {
+						qrUrl.push("https://menuplus.kr/qr/" + this.checkedStoreId[i] + "/" + this.checkedData[i] );
+					}
+					
+					var workSheetData = [];
+					
+					for(var i=0; i<qrUrl.length; i++ ){
+						tempArray = new Array(2);
+						tempArray[0] = this.checkedStoreRoomNm[i];  //객실명
+						tempArray[1] = qrUrl[i];					//qr url
+						
+						workSheetData[i] = tempArray;
+					}
+					
+					workSheetData.unshift(['객실명','URL']); //맨 윗줄 제목
+					
+					const workSheet = XLSX.utils.aoa_to_sheet(workSheetData);//2차원 배열을 파라미터로 넘겨야 한다.
+					const workBook = XLSX.utils.book_new();
+					XLSX.utils.book_append_sheet(workBook, workSheet, 'QR URL 리스트');
+					XLSX.writeFile(workBook, 'QR_URL.xlsx');
+					
+				},
+				
+				// 오류 메세지 초기화
+				initFormError: function () {
+					return {
+						storeRoomNm: '',
+						useYn: '',
+						storeRoomDesc: '',
+						storeRoomNmStart1:'',
+						storeRoomNmEnd1:'',
+						storeRoomNmStart2:'',
+						storeRoomNmEnd2:''
+					}
+				},
+				// 그리드 선택 이벤트
+				handleRowClick: function (val) {
+					if (null != val) {
+						this.btn.upDisabled = false;
+					}
+					this.selectData = val;
+				},
+				// 체크 박스 체크 이벤트
+				handleRowChecked: function (selection, row) {
+					if (selection.length > 0) {
+						this.btn.delDisabled = false;
+						this.btn.AllQrDownloadDisabled = false;
+						this.btn.AllQrUrlDownloadDisabled = false;
+					} else {
+						this.btn.delDisabled = true;
+						this.btn.AllQrDownloadDisabled = true;
+						this.btn.AllQrUrlDownloadDisabled = true;
+					}
+					
+					this.checkedData = [];
+					this.checkedStoreNm = [];
+					this.checkedStoreId = [];
+					this.checkedStoreRoomNm = [];
+
+					for (var i = 0, len = selection.length; i < len; i++) {
+						this.checkedData[this.checkedData.length] = selection[i].storeRoomCd;
+						this.checkedStoreNm[this.checkedStoreNm.length] = selection[i].store.storeNm;
+						this.checkedStoreId[this.checkedStoreId.length] = selection[i].store.storeId;
+						this.checkedStoreRoomNm[this.checkedStoreRoomNm.length] = selection[i].storeRoomNm;
+					}
+				},
+
+				initStore: function () {
+					this.mainVue.$axios.search('/store/getStore', null, function (result) {
+						this.storeLans = result.lans;
+						this.initStoreLans(result);
+					}.bind(this));
+				},
+
+				// 사전 조회를 위한 언어 정보 설정
+				initStoreLans: function (store) {
+					this.lans = [];
+					this.lans.push(store.defaultLan);
+					
+					for (var i = 0, len = store.lans.length; i < len; i++) {
+						this.lans.push(store.lans[i]);
+					}
+				},
+				// 추가
+				add: function () {
+					this.inputForm = this.initInputForm();
+					this.inputForm.title = '[[#{객실 정보 추가}]]';
+
+					this.formError = this.initFormError();
+			
+					this.dialogFormVisible = true;
+					this.btn.saveDisabled = false;
+				},
+
+				//객실 일괄생성
+				addAll: function () {
+					this.inputAllForm = this.initInputAllForm();
+					this.inputAllForm.title = '[[#{객실 일괄 생성}]]';
+
+					this.formError = this.initFormError();
+			
+					this.dialogAllFormVisible = true;
+					this.btn.saveAllDisabled = false;
+				},
+				
+				// 조회
+				search: function () {
+					this.mainVue.$axios.search(this.url, this.searchForm, function (result) {
+						this.tableData = result;
+						
+						this.btn.addDisabled = false;
+						this.btn.addAllDisabled = false;
+						this.btn.delDisabled = true;
+						this.btn.AllQrDownloadDisabled = true;
+						this.btn.AllQrUrlDownloadDisabled = true;
+						
+						this.inputForm = this.initInputForm();
+						this.inputAllForm = this.initInputAllForm();
+						this.formError = this.initFormError();
+					}.bind(this), false);
+				},
+				// 삭제
+				del: function () {
+					this.mainVue.$confirm("[[#{{0}를 삭제 하시겠습니까?(#{객실 정보})}]]", this.mainVue.appMsg.systemAlterTitle, {
+				          confirmButtonText: "[[#{삭제}]]",
+				          cancelButtonText: "[[#{취소}]]",
+				          type: 'info'
+				        }).then(function () {
+				        	this.mainVue.$axios.del(this.url + '/' + this.checkedData.join(","), function (result) {
+				        		this.mainVue.$message({ type: 'success', message: "[[#{삭제 성공}]]" });
+				        		this.search();
+							}.bind(this), true);
+				        }.bind(this)).catch(function () {
+				        	this.mainVue.$message({ type: 'info', message: "[[#{삭제 취소}]]" });
+				        }.bind(this));
+				},
+				// 저장
+				save: function () {
+					this.formError = this.initFormError();
+					
+					if ('I' === this.inputForm.statu) {
+						this.mainVue.$axios.add(this.url, this.inputForm, this.formError, function (result) {
+							this.mainVue.$message({ type: 'success', message: "[[#{등록 성공}]]" });
+							this.dialogFormVisible = false;
+							this.search();
+						}.bind(this), true);
+					}
+				},
+
+				// 객실정보일괄 생성
+				saveAll: function () {
+					this.formError = this.initFormError();
+					
+					var chkNm = this.chkStoreRoomsNm();
+					
+					if ('I' === this.inputAllForm.statu && chkNm === true) {
+
+						this.inputStoreNmForm.storeRoomNmStart.push(this.inputAllForm.storeRoomNmStart1);
+						this.inputStoreNmForm.storeRoomNmEnd.push(this.inputAllForm.storeRoomNmEnd1);
+						
+						if(this.inputAllForm.storeRoomNmStart2 != ''){
+							this.inputStoreNmForm.storeRoomNmStart.push(this.inputAllForm.storeRoomNmStart2);
+							this.inputStoreNmForm.storeRoomNmEnd.push(this.inputAllForm.storeRoomNmEnd2);
+						}
+
+						this.mainVue.$axios.get(this.url + '/rooms' + '/' + this.inputStoreNmForm.storeRoomNmStart.join(",") + '/' + this.inputStoreNmForm.storeRoomNmEnd.join(","), function (result) {
+							this.mainVue.$message({ type: 'success', message: "총 " + result +"개의 객실 " + "[[#{일괄 등록 성공}]]" });
+							this.dialogAllFormVisible = false;
+							this.search();
+						}.bind(this), true);
+					
+					}
+				},
+
+
+				searchDictionary: function () {
+					this.mainVue.$axios.search("/dictionary/search", { nm: this.searchText, dictionaryTpVal: "category" }, function (result) {
+						this.popTableData = [];
+						
+						for (var i = 0, len = result.length; i < len; i++) {
+							var tmp = result[i];
+							
+							tmp[result[i].lan.id] = result[i].nm;
+							
+							for (var j = 0, jlen = result[i].dictionarys.length; j < jlen; j++) {
+								tmp[result[i].dictionarys[j].lan.id] = result[i].dictionarys[j].nm;
+							}
+							
+							this.popTableData.push(tmp);
+						}
+					}.bind(this), true);
+				},
+				// 키워드 데이타 선택
+				selectDictionary: function (row) {
+					for (var i = 0, len = this.lans.length; i < len; i++) {
+						// 기본 언어 새팅
+						if (0 == i) {
+							this.inputForm.categoryNm = row[this.lans[i].id];
+						} else {
+							// 타언어 순서대로 등록
+							this.inputForm.categoryInfos[i-1].categoryInfoNm = row[this.lans[i].id];
+						}
+					}
+					
+					this.dictionaryDialogFormVisible = false;
+				}
+		    }
+		});
+	/*]]>*/
+	</script>
+</body>
+</html>

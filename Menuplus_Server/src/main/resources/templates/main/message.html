@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    
+    <meta http-equiv="pragma" content="no-cache">
+    <meta http-equiv="Cache-Control" content="no-cache, must-revalidate">
+    <meta http-equiv="expires" content="Wed, 14 Nov 1981 00:00:00 GMT">
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0">
+    <meta name="description" content="MenuPlus" />
+    <meta name="author" content="lf" />
+
+    <title>MenuPlus</title>
+
+    <!-- 아리바바 폰트 -->
+    <link rel="stylesheet" type="text/css" href="/libs/icon-font/iconfont.css">
+    <!-- (vue)elements ui css -->
+    <link rel="stylesheet" type="text/css" href="/libs/theme/index.css">
+    <link rel="stylesheet" type="text/css" href="/css/menuplus.css"/>
+	
+    
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/es6-promise@4/dist/es6-promise.min.js"></script>
+	<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/es6-promise@4/dist/es6-promise.auto.min.js"></script>
+	
+    <!-- vue.js -->
+	<!-- <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/vue"></script> -->
+	<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/vue@2.6.0"></script>
+    <!-- axios.js -->
+    <script type="text/javascript" src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <!-- (vue)elements ui js -->
+    <script type="text/javascript" src="https://unpkg.com/element-ui/lib/index.js"></script>
+
+	<script type="text/javascript" src="/js/axiosUtil.js"></script>
+</head>
+<body>
+    <div id="app" class="contain login">
+    	<!-- 처음 로딩시 레이아웃이 깨진 화면이 깜빡하는 현상, 하얀 로딩창 먼저 보여줌  -->
+		<div v-if="full_loading" class="full_loading"></div>
+		<div class="el-dialog__wrapper div_v_center">
+			<div class="login_box el-dialog">
+		        <!-- title -->
+		
+		        <div class="login-panel" v-if="login">
+		
+						<!--  메세지 표시 구역 -->
+						<div id="title" class="msg" th:text="#{[주문통지]}">&nbsp;</div>
+						<div id="msg" class="msg" th:text="${msg}">&nbsp;</div>
+		                    
+		                <div class="forget_pw">
+		              		<!-- <el-button type="primary" th:text="#{주문보기}" @click="viewOrder" class="btn_close"></el-button> -->
+		                	<el-button type="primary" th:text="#{닫기}" @click="closePopup" class="btn_close"></el-button>
+		                </div>
+		
+		        </div>
+        	</div>		
+        </div>
+    </div>
+    <script type="text/javascript"  charset="UTF-8">
+	/*<![CDATA[*/
+		
+        new Vue({
+            el: '#app',
+            data: function() {
+				return {
+					full_loading: true,		// 로딩 이미지 표시 상태
+					loading_: null,
+					login: true,
+	                locale: '[[${locale}]]',
+	                forgetMsg: ''
+				}
+            },
+            created: function () {
+            	// axios 초기화
+				this.$axios = axiosUtil.init(this);
+			},
+			mounted: function () {
+				// 로딩 이미지 숨김
+				this.full_loading = false;
+			},
+            methods: {
+            	
+            	// Loading 표시
+				showLoading: function() {
+					this.loading_ = this.$loading({
+		                lock: true,
+		                text: appMsg.loadingMsg,
+		                spinner: 'el-icon-loading',
+		                background: 'rgba(0, 0, 0, 0.7)'
+		            });
+				},
+				// Loading 닫기
+				closeLoading: function() {
+					if (null != this.loading_) this.loading_.close();
+				},
+            	
+            	//팝업닫기
+            	closePopup: function () {
+            		window.close();
+            	},
+            	
+            	viewOrder: function () {
+            		alert('부모창 메인호출');
+            		opener.parent.setMainMenu();
+            	}
+            	
+            }
+        });
+	/*]]>*/
+    </script>
+</body>
+</html>

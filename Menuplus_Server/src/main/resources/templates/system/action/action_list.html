@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:include="main/import :: head"></head>
+<body>
+	<div id="app" class="contain">
+		<!-- 검색 조건 -->
+		<div class="search_form" ref="search_form">
+			<el-form :inline="true" :model="searchForm" label-width="170px" label-suffix=":" :size="size" @submit.native.prevent>
+				<el-row>
+					<el-col :span="7">
+						<el-form-item th:label="#{이벤트 코드,명}">
+							<el-input v-model="searchForm.actionNm" @keyup.enter.native="search" clearable="true"></el-input>
+						</el-form-item>
+					</el-col>
+					<el-col :span="7">
+						<el-form-item th:label="#{타입}">
+							<code-combo :data="actionTp" th:label="#{전체}" :model="searchForm.actionTpCd" @change="searchForm.actionTpCd = $event.cd"></code-combo>
+						</el-form-item>
+					</el-col>
+					<el-col :span="7">
+						<el-form-item th:label="#{사용 가능 여부}">
+							<combo :data="mainVue.code.useYn" th:label="#{전체}" :model="searchForm.useYn" @change="searchForm.useYn = $event"></combo>
+						</el-form-item>
+					</el-col>
+				</el-row>
+			</el-form>
+		</div>
+		
+		<!-- 버튼-->
+		<div class="buttons" ref="buttons">
+			<el-button th:if='${sa_actions.contains("ActionSearch")}' :size="size" th:text="#{검색}" @click="search" icon="el-icon-search" ></el-button>
+			<el-button th:if='${sa_actions.contains("ActionAdd")}' :size="size" th:text="#{등록}" @click="add" icon="el-icon-circle-plus-outline" :disabled="btn.addDisabled" ></el-button>
+			<el-button th:if='${sa_actions.contains("ActionUp")}' :size="size" th:text="#{수정}" @click="up" icon="el-icon-edit-outline" :disabled="btn.upDisabled" ></el-button>
+			<el-button th:if='${sa_actions.contains("ActionDel")}' :size="size" th:text="#{삭제}" @click="del" icon="el-icon-remove-outline" :disabled="btn.delDisabled" ></el-button>
+			<el-button th:if='${sa_actions.contains("ActionAdd") || sa_actions.contains("ActionUp")}' :size="size" th:text="#{저장}" @click="save" icon="el-icon-check" :disabled="btn.saveDisabled" style="float: right;"></el-button>
+		</div>
+		
+		<!-- 리스트 -->
+		<el-row :gutter="20">
+			<el-col :span="16">
+				<el-table :height="tableHeight" border stripe highlight-current-row tooltip-effect="dark"
+						:data="tableData" :size="size" th:empty-text="#{데이타 없음}"
+						@row-click="handleRowClick" @select="handleRowChecked" @select-all="handleRowChecked">
+					<el-table-column :label="tableData.length" type="index" 	width="55" align="center" sortable fixed label-class-name="data_cnt"></el-table-column>
+					<el-table-column type="selection" 		width="45" 		align="center" fixed></el-table-column>
+					<el-table-column th:label="#{코드}" 		prop="resourcesCd" 	width="70" align="center" sortable fixed></el-table-column>
+					<el-table-column th:label="#{이벤트코드}"	prop="actionId" 	width="120" sortable fixed show-overflow-tooltip></el-table-column>
+					<el-table-column th:label="#{이벤트명}" 	prop="actionNm" 	min-width="150" sortable show-overflow-tooltip></el-table-column>
+					<el-table-column th:label="#{타입}" 		prop="actionTp.nmLan" 	min-width="70" align="center"></el-table-column>
+					<el-table-column th:label="#{주소}" 		prop="url" 			min-width="150" sortable show-overflow-tooltip></el-table-column>
+					<el-table-column th:label="#{호출 타입}" 	prop="method" 		min-width="100" sortable></el-table-column>
+					<el-table-column th:label="#{사용 가능 여부}" prop="useYn" 		min-width="110" align="center" :formatter="mainVue.formatterCode"></el-table-column>
+					<el-table-column th:label="#{이벤트  설명}" prop="resDesc" 		min-width="300" show-overflow-tooltip></el-table-column>
+				</el-table>
+			</el-col>
+			<el-col :span="8">
+				<el-card shadow="never" :style="{ height: inputHeight + 'px' }">
+					<div slot="header">
+						<span th:text="#{이벤트}"></span>
+						<span v-if="'I' == inputForm.statu" th:text="#{추가}"></span>
+						<span v-if="'U' == inputForm.statu" th:text="#{수정}"></span>
+					</div>
+					<div>
+						<el-form :model="inputForm" label-width="120px" label-suffix=":"
+								:size="size" :disabled="fromDisabled" @submit.native.prevent>
+							<el-form-item th:label="#{이벤트코드}" :error="formError.actionId" required>
+								<el-input v-model="inputForm.actionId" maxlength="50" show-word-limit
+									clearable="true" v-if="'I' === inputForm.statu"></el-input>
+								<span v-else class="show_cd">{{ inputForm.actionId }}</span>
+							</el-form-item>
+							<el-form-item th:label="#{이벤트명}" :error="formError.actionNm" required>
+								<el-input v-model="inputForm.actionNm" maxlength="50" clearable="true" show-word-limit></el-input>
+							</el-form-item>
+							<el-form-item th:label="#{타입}" :error="formError['actionTp.nm']" required>
+								<code-combo :data="actionTp" :model="inputForm.actionTp" @change="inputForm.actionTp = $event"></code-combo>
+							</el-form-item>
+							<el-form-item th:label="#{주소}" :error="formError.url" required>
+								<el-input v-model="inputForm.url" maxlength="50" clearable="true" show-word-limit></el-input>
+							</el-form-item>
+							<el-form-item th:label="#{호출 타입}" :error="formError.method" required>
+								<combo :data="mainVue.code.method" :model="inputForm.method" @change="inputForm.method = $event"></combo>
+							</el-form-item>
+							<el-form-item th:label="#{사용 가능 여부}" required>
+								<combo :data="mainVue.code.useYn" :model="inputForm.useYn" @change="inputForm.useYn = $event"></combo>
+							</el-form-item>
+							<el-form-item th:label="#{이벤트  설명}">
+								<el-input v-model="inputForm.resDesc" type="textarea" maxlength="250" show-word-limit></el-input>
+							</el-form-item>
+						</el-form>
+					</div>
+				</el-card>
+			</el-col>
+		</el-row>
+	</div>
+	
+    <script type="text/javascript" charset="UTF-8">
+	/*<![CDATA[*/
+		new Vue({
+			el: '#app',
+			data: function () {
+				var data = parent.mainVue.initData();
+				data.url = "/action";
+				
+				data.actionTp = [];
+				
+				data.searchForm = this.initSearchForm();
+				data.inputForm = this.initInputForm();
+				data.formError = this.initFormError();
+				
+				return data;
+			},
+			created: function () {
+				this.search();
+				this.initEvent();
+			},
+			mounted: function () {
+				setTimeout(function () {
+					this.$nextTick(function () {
+						this.mainVue.currVue = this;
+					}.bind(this));	
+				}.bind(this), 500);
+			},
+			watch: {
+				'inputForm.actionId': function (newVal, oldVal) {
+					if ('' != newVal && "I" == this.inputForm.statu) {
+						this.chkActionId();
+					}
+				},
+				'inputForm.actionNm': function (newVal, oldVal) {
+					if ('' != newVal) {
+						this.chkActionNm();
+					}
+				},
+				'inputForm.url': function (newVal, oldVal) {
+					if ('' != newVal) {
+						this.chkUrlMethod();
+					}
+				},
+				'inputForm.method': function (newVal, oldVal) {
+					if ('' != newVal) {
+						this.chkUrlMethod();
+					}
+				}
+			},
+			methods: {
+				// 검색 조건 초기화
+				initSearchForm: function () {
+					return {
+						actionNm: '',
+						actionTpCd: 0,
+						useYn: ''
+					}
+				},
+				// 입력폼 초기화
+				initInputForm: function () {
+					return {
+						statu: "I",
+						resourcesCd: 0,
+						actionId: '',
+						actionNm: '',
+						actionTp: { cd: null, nm: '' },
+						url: '',
+						method: 'NONE',
+						resDesc: '',
+						useYn: 'Y'
+					}
+				},
+				// 오류 메세지 초기화
+				initFormError: function () {
+					return {
+						actionId: '',
+						actionNm: '',
+						'actionTp.nm': '',
+						url: '',
+						method: '',
+						resDesc: ''
+					}
+				},
+				// 그리드 선택 이벤트
+				handleRowClick: function (val) {
+					if (null != val) {
+						this.btn.upDisabled = false;
+					}
+					this.selectData = val;
+				},
+				// 체크 박스 체크 이벤트
+				handleRowChecked: function (selection, row) {
+					if (selection.length > 0) {
+						this.btn.delDisabled = false;	
+					} else {
+						this.btn.delDisabled = true;
+					}
+					
+					this.checkedData = [];
+					
+					for (var i = 0, len = selection.length; i < len; i++) {
+						this.checkedData[this.checkedData.length] = selection[i].resourcesCd;
+					}
+				},
+				// 이벤트 타입 데이타 초기화
+				initEvent: function () {
+					this.mainVue.$axios.search("/code/getCode/EVENT", null, function (result) {
+						this.actionTp = result;
+					}.bind(this), false);
+				},
+				// 추가
+				add: function () {
+					this.inputForm = this.initInputForm();
+					this.inputForm.actionTp = this.actionTp.length > 0 ? util.copyObj(this.actionTp[0]) : { cd: null, nm: '' };
+					
+					this.formError = this.initFormError();
+						
+					this.btn.saveDisabled = false;
+					this.fromDisabled = false;
+				},
+				// 수정
+				up: function () {
+					this.mainVue.$axios.get(this.url + '/' + this.selectData.resourcesCd, function (result) {
+						result.statu = "U";
+						
+						this.inputForm = result;
+						
+						this.formError = this.initFormError();
+						
+						this.btn.saveDisabled = false;
+						this.fromDisabled = false;
+					}.bind(this), true);
+				},
+				// 조회
+				search: function () {
+					this.mainVue.$axios.search(this.url, this.searchForm, function (result) {
+						this.tableData = result;
+						
+						this.btn.addDisabled = false;
+						this.btn.upDisabled = true;
+						this.btn.delDisabled = true;
+						this.btn.saveDisabled = true;
+						this.fromDisabled = true;
+						
+						this.inputForm = this.initInputForm();
+						this.formError = this.initFormError();
+					}.bind(this), false);
+				},
+				// 삭제
+				del: function () {
+					this.mainVue.$confirm("[[#{{0}를 삭제 하시겠습니까?(#{이벤트 정보})}]]", this.mainVue.appMsg.systemAlterTitle, {
+				          confirmButtonText: "[[#{삭제}]]",
+				          cancelButtonText: "[[#{취소}]]",
+				          type: 'info'
+				        }).then(function () {
+				        	this.mainVue.$axios.del(this.url + "/" + this.checkedData.join(","), function (result) {
+				        		this.mainVue.$message({ type: 'success', message: "[[#{삭제 성공}]]" });
+				        		this.search();
+							}.bind(this), true);
+				        }.bind(this)).catch(function () {
+				        	this.mainVue.$message({ type: 'info', message: "[[#{삭제 취소}]]" });
+				        }.bind(this));
+				},
+				// 저장
+				save: function () {
+					this.formError = this.initFormError();
+					
+					if ('I' === this.inputForm.statu) {
+						this.mainVue.$axios.add(this.url, this.inputForm, this.formError, function (result) {
+							this.mainVue.$message({ type: 'success', message: "[[#{등록 성공}]]" });
+							this.search();
+						}.bind(this), true);
+					} else {
+						this.mainVue.$axios.up(this.url + "/" + this.inputForm.resourcesCd, this.inputForm, this.formError, function (result) {
+							this.mainVue.$message({ type: 'success', message: "[[#{수정 성공}]]" });
+							this.search();
+						}.bind(this), true);
+					}
+				},
+				// 이벤트 아이디 체크
+				chkActionId: function () {
+					this.mainVue.$axios.patchNonLoading(this.url + '/chk/' + this.inputForm.actionId, null, null, function (result) {
+						if ("" == result) {
+							this.formError.actionId = '';
+							this.btn.saveDisabled = false;
+						} else {
+							this.formError.actionId = "[[#{이미 사용중인 {0} 입니다.(#{아이디})}]]";
+							this.btn.saveDisabled = true;
+						}
+					}.bind(this), false);
+				},
+				// 이벤트명 체크
+				chkActionNm: function () {
+					this.mainVue.$axios.patchNonLoading(this.url + '/chkNm/' + this.inputForm.actionNm, null, null, function (result) {
+						if ("" == result || result.resourcesCd == this.inputForm.resourcesCd) {
+							this.formError.actionNm = '';
+							this.btn.saveDisabled = false;
+						} else {
+							this.formError.actionNm = "[[#{이미 사용중인 {0} 입니다.(#{이벤트명})}]]";
+							this.btn.saveDisabled = true;
+						}
+					}.bind(this), false);
+				},
+				chkUrlMethod: function () {
+					if ("" != this.inputForm.url && "" != this.inputForm.method) {
+						this.mainVue.$axios.patchNonLoading('/resources/chk/' + this.inputForm.url.replace(/[/]/g, "-") + '/'  + this.inputForm.method, null, null, function (result) {
+							if ("" == result || result.resourcesCd == this.inputForm.resourcesCd) {
+								this.formError.url = '';
+								this.formError.method = '';
+								this.btn.saveDisabled = false;
+							} else {
+								this.formError.url = "[[#{이미 사용중인 {0},{1} 조합 입니다.(#{주소},#{호출 타입})}]]";
+								this.formError.method = "[[#{이미 사용중인 {0},{1} 조합 입니다.(#{주소},#{호출 타입})}]]";
+								this.btn.saveDisabled = true;
+							}
+						}.bind(this), false);
+					}
+				}
+		    }
+		});
+	/*]]>*/
+	</script>
+</body>
+</html>
