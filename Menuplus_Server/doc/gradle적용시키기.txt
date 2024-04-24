@@ -1,0 +1,1 @@
+gradle 프로젝트 내려 받은 후  프로젝트 오른쪽 마우스 클릭 > Configure > Add Gradle Nature 클릭
